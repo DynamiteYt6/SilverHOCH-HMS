@@ -1,10 +1,10 @@
 # Silver HOCH Hotel Management System (HMS)
 
-A comprehensive web-based hotel management system designed for small hotels to manage daily operations including room bookings, short stays, inventory sales, payments, and end-of-day reconciliation.
+A comprehensive backend API for a hotel management system designed for small hotels to manage daily operations including room bookings, short stays, inventory sales, payments, and end-of-day reconciliation.
 
 ## Overview
 
-Silver HOCH HMS is an internal hotel management system built for a 20-room hotel. The system streamlines operations for front desk staff, drinks sellers, and administrators with role-based access control and real-time room management.
+Silver HOCH HMS is an internal hotel management system built for a 20-room hotel. The system streamlines operations for front desk staff, drinks sellers, and administrators with role-based access control and real-time room management. This repository contains the backend API implementation.
 
 ## Features
 
@@ -50,10 +50,15 @@ Silver HOCH HMS is an internal hotel management system built for a 20-room hotel
 ### Backend
 - **Node.js** - Runtime environment
 - **Express.js** - Web framework
+- **TypeScript** - Type-safe JavaScript
+- **Prisma** - Database ORM and migration tool
 - **PostgreSQL** - Primary database
+- **JWT** - Authentication
+- **bcrypt** - Password hashing
 
 ### Reporting
 - **Excel** - Export-only reporting (not used as live data source)
+
 
 ## User Roles
 
@@ -75,119 +80,105 @@ Silver HOCH HMS is an internal hotel management system built for a 20-room hotel
 
 1. **Clone the repository**
 ```bash
-git clone https://github.com/yourusername/silver-hoch-hms.git
-cd silver-hoch-hms
+git clone https://github.com/DynamiteYt6/SilverHOCH-HMS.git
+cd SilverHOCH-HMS
 ```
 
 2. **Install backend dependencies**
 ```bash
-cd backend
+cd server
 npm install
 ```
 
-3. **Install frontend dependencies**
-```bash
-cd ../frontend
-npm install
-```
+3. **Configure environment variables**
 
-4. **Configure environment variables**
-
-Create a `.env` file in the backend directory:
+Create a `.env` file in the server directory:
 ```env
-PORT=5000
+PORT=3000
 DATABASE_URL=postgresql://username:password@localhost:5432/silver_hoch_hms
 JWT_SECRET=your_jwt_secret_key
 NODE_ENV=development
 ```
 
-5. **Set up the database**
+4. **Set up the database**
 ```bash
-cd backend
-npm run db:migrate
-npm run db:seed
+# Generate Prisma client
+npx prisma generate
+
+# Run migrations
+npx prisma migrate deploy
+
+# Seed the database (if seed script is implemented)
+npx prisma db seed
 ```
 
-6. **Start the development servers**
-
-Backend:
+5. **Start the development server**
 ```bash
-cd backend
 npm run dev
 ```
 
-Frontend (in a new terminal):
-```bash
-cd frontend
-npm start
-```
-
-The application will be available at `http://localhost:3000`
+The API will be available at `http://localhost:3000`
 
 ## Project Structure
 
 ```
-silver-hoch-hms/
-├── backend/
+SilverHOCH-HMS/
+├── server/
+│   ├── prisma/
+│   │   ├── schema.prisma    # Database schema
+│   │   ├── seed.ts          # Database seeding script
+│   │   └── migrations/      # Database migrations
 │   ├── src/
-│   │   ├── config/         # Database and app configuration
-│   │   ├── controllers/    # Request handlers
-│   │   ├── models/         # Database models
-│   │   ├── routes/         # API routes
-│   │   ├── middleware/     # Auth, validation, error handling
-│   │   ├── services/       # Business logic
-│   │   └── utils/          # Helper functions
-│   ├── migrations/         # Database migrations
-│   ├── seeds/              # Database seed data
-│   └── server.js           # Entry point
-├── frontend/
-│   ├── public/
-│   ├── src/
-│   │   ├── components/     # React components
-│   │   ├── pages/          # Page components
-│   │   ├── services/       # API calls
-│   │   ├── context/        # React context
-│   │   ├── hooks/          # Custom hooks
-│   │   └── utils/          # Helper functions
-│   └── package.json
+│   │   ├── lib/
+│   │   │   ├── hash.ts      # Password hashing utilities
+│   │   │   ├── jwt.ts       # JWT token utilities
+│   │   │   └── prisma.ts    # Prisma client instance
+│   │   ├── middleware/
+│   │   │   └── middleware.ts # Authentication middleware
+│   │   ├── routes/
+│   │   │   └── auth.ts      # Authentication routes
+│   │   ├── app.ts           # Express app configuration
+│   │   └── server.ts        # Server entry point
+│   ├── .env                 # Environment variables
+│   ├── package.json         # Dependencies and scripts
+│   ├── tsconfig.json        # TypeScript configuration
+│   └── .gitignore
 └── README.md
 ```
 
 ## API Documentation
 
+### Health Check
+- `GET /` - Server status
+- `GET /health` - Health check endpoint
+- `GET /test-db` - Database connection test
+
 ### Authentication
 - `POST /api/auth/login` - User login
-- `POST /api/auth/logout` - User logout
+  - Body: `{ "username": "string", "password": "string" }`
+  - Returns: JWT token and user info
 
-### Rooms
+### Rooms (Planned)
 - `GET /api/rooms` - Get all rooms
 - `GET /api/rooms/:id` - Get room details
 - `PATCH /api/rooms/:id/status` - Update room status
 
-### Bookings
+### Bookings (Planned)
 - `POST /api/bookings` - Create booking
 - `GET /api/bookings` - Get all bookings
 - `GET /api/bookings/:id` - Get booking details
 - `PATCH /api/bookings/:id/checkout` - Checkout booking
 - `PATCH /api/bookings/:id/payment` - Update payment status
 
-### Inventory
+### Inventory (Planned)
 - `GET /api/inventory` - Get inventory items
 - `POST /api/inventory/sale` - Record sale
 - `PATCH /api/inventory/:id` - Update inventory quantity
 
-### Reports
+### Reports (Planned)
 - `GET /api/reports/daily` - Get daily summary
 - `POST /api/reports/eod` - Confirm end-of-day
 - `GET /api/reports/export` - Export to Excel
-
-## Security
-
-- JWT-based authentication
-- Role-based access control (RBAC)
-- Password hashing with bcrypt
-- SQL injection prevention with parameterized queries
-- Audit logging for critical actions
 
 ## Database Schema
 
@@ -198,55 +189,74 @@ Key tables:
 - `payments` - Payment records
 - `inventory_items` - Drinks and condoms
 - `sales` - Inventory sales transactions
-- `daily_summaries` - End-of-day reconciliation data
-- `audit_logs` - System activity logs
+- `business_days` - End-of-day reconciliation data
 
 ## Development
 
-### Running Tests
+### Available Scripts
 ```bash
-# Backend tests
-cd backend
-npm test
+# Development server with hot reload
+npm run dev
 
-# Frontend tests
-cd frontend
-npm test
+# Build for production
+npm run build
+
+# Start production server
+npm start
 ```
 
-### Database Migrations
+### Database Operations
 ```bash
-# Create new migration
-npm run migration:create migration_name
+# Generate Prisma client
+npx prisma generate
 
-# Run migrations
-npm run db:migrate
+# Create and apply migrations
+npx prisma migrate dev
 
-# Rollback migration
-npm run db:rollback
+# View database
+npx prisma studio
+
+# Reset database
+npx prisma migrate reset
+
+# Seed database
+npx prisma db seed
 ```
+
+## Security
+
+- JWT-based authentication
+- Role-based access control (RBAC)
+- Password hashing with bcrypt
+- SQL injection prevention with Prisma ORM
+- Environment variable configuration
 
 ## Deployment
 
 1. Set production environment variables
-2. Build frontend: `cd frontend && npm run build`
+2. Build the application: `npm run build`
 3. Configure PostgreSQL production database
 4. Run database migrations on production
-5. Deploy backend to hosting service (e.g., Heroku, AWS, DigitalOcean)
-6. Serve frontend build from backend or CDN
+5. Deploy to hosting service (e.g., Heroku, AWS, DigitalOcean, Railway)
 
 ## Future Enhancements
 
 The following features are planned for future releases:
+- Complete API implementation for all endpoints
+- Frontend application (React-based)
 - Online booking support for customers
 - Online payment gateway integration
 - Multi-hotel management support
 - Advanced analytics and forecasting
 - Mobile application
 
-## Support
+## Contributing
 
-For issues, questions, or contributions, please contact the development team or create an issue in the repository.
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests if applicable
+5. Submit a pull request
 
 ## License
 
@@ -255,4 +265,4 @@ This project is proprietary software developed for Silver HOCH Hotel.
 ---
 
 **Version**: 1.0  
-**Last Updated**: January 2026
+**Last Updated**: January 24, 2026

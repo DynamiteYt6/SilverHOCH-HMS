@@ -1,0 +1,193 @@
+  // This is your Prisma schema file,
+  // learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+  // Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+  // Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+  generator client {
+    provider = "prisma-client-js"
+  }
+
+  datasource db {
+    provider = "postgresql"
+    url      = env("DATABASE_URL")
+  }
+
+  /////////////////////////////////////////////////
+  // ENUMS
+  /////////////////////////////////////////////////
+
+  enum UserRole {
+    SUPER_ADMIN
+    ADMIN
+    FRONT_DESK
+    DRINKS_SELLER
+  }
+
+  enum RoomType {
+    FAN
+    AC
+  }
+
+  enum RoomStatus {
+    AVAILABLE
+    OCCUPIED
+    CLEANING
+    RESERVED
+  }
+
+  enum StayType {
+    OVERNIGHT
+    SHORT_STAY
+  }
+
+  enum BookingSource {
+    WALK_IN
+    ONLINE // for V2
+  }
+
+  enum PaymentMethod {
+    CASH
+    POS
+    TRANSFER
+    ONLINE_GATEWAY // V2/3
+  }
+
+  enum PaymentStatus {
+    PAID
+    PENDING
+  }
+
+  enum InventoryCategory {
+    DRINK
+    CONDOM
+  }
+
+  enum BookingType {
+    NORMAL
+    COMPLIMENTARY
+  }
+
+  /////////////////////////////////////////////////
+  // CORE MODELS
+  /////////////////////////////////////////////////
+
+  model User {
+    id       String   @id @default(uuid())
+    name     String
+    username String   @unique
+    password String
+    role     UserRole
+    isActive Boolean  @default(true)
+
+    bookings Booking[]
+    sales    Sale[]
+
+    confirmedBusinessDays BusinessDay[] @relation("BusinessDayConfirmedBy")
+
+    createdAt DateTime @default(now())
+  }
+
+  model Room {
+    id     String     @id @default(uuid())
+    number Int        @unique
+    type   RoomType
+    status RoomStatus @default(AVAILABLE)
+    floor  Int
+
+    bookings Booking[]
+
+    createdAt DateTime @default(now())
+  }
+
+  model Booking {
+    id     String @id @default(uuid())
+    room   Room   @relation(fields: [roomId], references: [id])
+    roomId String
+
+    stayType    StayType
+    bookingType BookingType   @default(NORMAL)
+    source      BookingSource @default(WALK_IN)
+
+    checkIn      DateTime
+    checkOut     DateTime?
+    shortStayEnd DateTime?
+
+    price      Int // 0 for complimentary
+    isOverstay Boolean @default(false)
+
+    payment     Payment?
+    createdBy   User     @relation(fields: [createdById], references: [id])
+    createdById String
+
+    businessDay   BusinessDay @relation(fields: [businessDayId], references: [id])
+    businessDayId String
+
+    note String? // "Owner & kids"
+
+    createdAt DateTime @default(now())
+  }
+
+  model Payment {
+    id        String  @id @default(uuid())
+    booking   Booking @relation(fields: [bookingId], references: [id])
+    bookingId String  @unique
+
+    amount    Int
+    method    PaymentMethod
+    status    PaymentStatus
+    reference String?
+
+    createdAt DateTime @default(now())
+  }
+
+  /////////////////////////////////////////////////
+  // INVENTORY & SALES
+  /////////////////////////////////////////////////
+
+  model InventoryItem {
+    id       String            @id @default(uuid())
+    name     String
+    category InventoryCategory
+    quantity Int
+    price    Int
+
+    sales Sale[]
+
+    createdAt DateTime @default(now())
+  }
+
+  model Sale {
+    id     String        @id @default(uuid())
+    item   InventoryItem @relation(fields: [itemId], references: [id])
+    itemId String
+
+    quantity   Int
+    totalPrice Int
+
+    soldBy   User   @relation(fields: [soldById], references: [id])
+    soldById String
+
+    businessDay   BusinessDay @relation(fields: [businessDayId], references: [id])
+    businessDayId String
+
+    createdAt DateTime @default(now())
+  }
+
+  /////////////////////////////////////////////////
+  // BUSINESS DAY (END-OF-DAY LOCKING)
+  /////////////////////////////////////////////////
+
+  model BusinessDay {
+    id       String   @id @default(uuid())
+    date     DateTime @unique
+    isLocked Boolean  @default(false)
+
+    bookings Booking[]
+    sales    Sale[]
+
+    confirmedBy   User?   @relation("BusinessDayConfirmedBy", fields: [confirmedById], references: [id])
+    confirmedById String?
+
+    createdAt DateTime @default(now())
+  }
