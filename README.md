@@ -398,8 +398,4 @@ This project is proprietary software developed for Silver HOCH Hotel.
 **Version**: 1.0  
 **Status**: Active Development  
 **Last Updated**: January 25, 2026  
-<<<<<<< HEAD
 **Author**: DynamiteYt6
-=======
-**Author**: DynamiteYt6
->>>>>>> 632f679a0347bd41e8570149254a9fdf2f83c932
