@@ -43,22 +43,21 @@ Silver HOCH HMS is an internal hotel management system built for a 20-room hotel
 
 ## Tech Stack
 
-### Frontend
-- **React** - UI framework
-- **Modern JavaScript (ES6+)**
-
 ### Backend
 - **Node.js** - Runtime environment
 - **Express.js** - Web framework
 - **TypeScript** - Type-safe JavaScript
-- **Prisma** - Database ORM and migration tool
+- **Prisma ORM** - Database ORM and migration tool
 - **PostgreSQL** - Primary database
-- **JWT** - Authentication
+- **JWT (jsonwebtoken)** - Authentication tokens
 - **bcrypt** - Password hashing
+- **tsx** - TypeScript execution for development
+- **dotenv** - Environment variable management
 
-### Reporting
-- **Excel** - Export-only reporting (not used as live data source)
-
+### Development Tools
+- **nodemon** - Development server with hot reload
+- **Prisma Studio** - Database GUI
+- **ts-node** - TypeScript execution
 
 ## User Roles
 
@@ -74,19 +73,18 @@ Silver HOCH HMS is an internal hotel management system built for a 20-room hotel
 ### Prerequisites
 - Node.js (v16 or higher)
 - PostgreSQL (v13 or higher)
-- npm or yarn
+- npm (comes with Node.js)
 
 ### Setup
 
 1. **Clone the repository**
 ```bash
 git clone https://github.com/DynamiteYt6/SilverHOCH-HMS.git
-cd SilverHOCH-HMS
+cd SilverHOCH-HMS/server
 ```
 
-2. **Install backend dependencies**
+2. **Install dependencies**
 ```bash
-cd server
 npm install
 ```
 
@@ -94,23 +92,27 @@ npm install
 
 Create a `.env` file in the server directory:
 ```env
+DATABASE_URL="postgresql://postgres:your_password@localhost:5432/silverhoch_hms"
+JWT_SECRET=super-secret-change-later
 PORT=3000
-DATABASE_URL=postgresql://username:password@localhost:5432/silver_hoch_hms
-JWT_SECRET=your_jwt_secret_key
-NODE_ENV=development
 ```
 
 4. **Set up the database**
+
 ```bash
 # Generate Prisma client
 npx prisma generate
 
-# Run migrations
-npx prisma migrate deploy
+# Run database migrations
+npx prisma migrate dev --name init
 
-# Seed the database (if seed script is implemented)
-npx prisma db seed
+# Seed the database with initial data
+npx tsx prisma/seed.ts
 ```
+
+The seed script creates:
+- An admin user (username: `admin`, password: `admin123`)
+- 3 sample rooms (101 - Fan, 102 - AC, 201 - AC)
 
 5. **Start the development server**
 ```bash
@@ -125,80 +127,139 @@ The API will be available at `http://localhost:3000`
 SilverHOCH-HMS/
 ├── server/
 │   ├── prisma/
-│   │   ├── schema.prisma    # Database schema
-│   │   ├── seed.ts          # Database seeding script
-│   │   └── migrations/      # Database migrations
+│   │   ├── schema.prisma       # Database schema with all models
+│   │   ├── seed.ts             # Database seeding script
+│   │   └── migrations/         # Database migration history
 │   ├── src/
 │   │   ├── lib/
-│   │   │   ├── hash.ts      # Password hashing utilities
-│   │   │   ├── jwt.ts       # JWT token utilities
-│   │   │   └── prisma.ts    # Prisma client instance
+│   │   │   ├── hash.ts         # Password hashing utilities (bcrypt)
+│   │   │   ├── jwt.ts          # JWT token generation & verification
+│   │   │   └── prisma.ts       # Prisma client instance
 │   │   ├── middleware/
-│   │   │   └── middleware.ts # Authentication middleware
+│   │   │   └── auth.ts         # JWT authentication middleware
 │   │   ├── routes/
-│   │   │   └── auth.ts      # Authentication routes
-│   │   ├── app.ts           # Express app configuration
-│   │   └── server.ts        # Server entry point
-│   ├── .env                 # Environment variables
-│   ├── package.json         # Dependencies and scripts
-│   ├── tsconfig.json        # TypeScript configuration
+│   │   │   └── auth.ts         # Authentication routes (login)
+│   │   ├── app.ts              # Express app configuration
+│   │   └── server.ts           # Server entry point
+│   ├── .env                    # Environment variables (not in repo)
+│   ├── package.json            # Dependencies and scripts
+│   ├── tsconfig.json           # TypeScript configuration
 │   └── .gitignore
 └── README.md
 ```
 
 ## API Documentation
 
-### Health Check
-- `GET /` - Server status
+### Health Check Endpoints
+- `GET /` - Server status check
+  - Response: `"Server is running 🚀"`
 - `GET /health` - Health check endpoint
+  - Response: `{ "status": "ok" }`
 - `GET /test-db` - Database connection test
+  - Response: `{ "success": true, "result": [...] }`
 
 ### Authentication
-- `POST /api/auth/login` - User login
-  - Body: `{ "username": "string", "password": "string" }`
-  - Returns: JWT token and user info
+- `POST /auth/login` - User login
+  - **Body**: 
+    ```json
+    {
+      "username": "admin",
+      "password": "admin123"
+    }
+    ```
+  - **Response**: 
+    ```json
+    {
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+      "user": {
+        "id": "uuid",
+        "name": "Super Admin",
+        "role": "SUPER_ADMIN"
+      }
+    }
+    ```
 
-### Rooms (Planned)
+### Protected Routes
+All routes below require JWT authentication via the `Authorization` header:
+```
+Authorization: Bearer <your_jwt_token>
+```
+
+- `GET /protected` - Test authentication
+  - **Headers**: `Authorization: Bearer <token>`
+  - **Response**: 
+    ```json
+    {
+      "message": "You are authenticated!",
+      "user": {
+        "id": "uuid",
+        "role": "SUPER_ADMIN"
+      }
+    }
+    ```
+
+### Rooms (Coming Soon)
 - `GET /api/rooms` - Get all rooms
 - `GET /api/rooms/:id` - Get room details
 - `PATCH /api/rooms/:id/status` - Update room status
 
-### Bookings (Planned)
+### Bookings (Coming Soon)
 - `POST /api/bookings` - Create booking
 - `GET /api/bookings` - Get all bookings
 - `GET /api/bookings/:id` - Get booking details
 - `PATCH /api/bookings/:id/checkout` - Checkout booking
 - `PATCH /api/bookings/:id/payment` - Update payment status
 
-### Inventory (Planned)
+### Inventory (Coming Soon)
 - `GET /api/inventory` - Get inventory items
 - `POST /api/inventory/sale` - Record sale
 - `PATCH /api/inventory/:id` - Update inventory quantity
 
-### Reports (Planned)
+### Reports (Coming Soon)
 - `GET /api/reports/daily` - Get daily summary
 - `POST /api/reports/eod` - Confirm end-of-day
 - `GET /api/reports/export` - Export to Excel
 
 ## Database Schema
 
-Key tables:
-- `users` - System users with roles
-- `rooms` - Room inventory and status
-- `bookings` - Customer bookings and stays
-- `payments` - Payment records
-- `inventory_items` - Drinks and condoms
-- `sales` - Inventory sales transactions
-- `business_days` - End-of-day reconciliation data
+### Core Models
+
+**User**
+- id, name, username, password (hashed), role, isActive
+- Roles: SUPER_ADMIN, ADMIN, FRONT_DESK, DRINKS_SELLER
+
+**Room**
+- id, number, type (FAN/AC), status, floor
+- Statuses: AVAILABLE, OCCUPIED, CLEANING, RESERVED
+
+**Booking**
+- id, roomId, stayType (OVERNIGHT/SHORT_STAY), bookingType, source
+- checkIn, checkOut, shortStayEnd, price, isOverstay
+- Linked to: Room, User (creator), Payment, BusinessDay
+
+**Payment**
+- id, bookingId, amount, method (CASH/POS/TRANSFER), status
+- Status: PAID, PENDING
+
+**InventoryItem**
+- id, name, category (DRINK/CONDOM), quantity, price
+
+**Sale**
+- id, itemId, quantity, totalPrice, soldById
+- Linked to: InventoryItem, User, BusinessDay
+
+**BusinessDay**
+- id, date, isLocked, confirmedById
+- Used for end-of-day reconciliation
 
 ## Development
 
 ### Available Scripts
 ```bash
-# Development server with hot reload
+# Development server with hot reload (using tsx)
 npm run dev
 
-# Build for production
+# Build TypeScript to JavaScript
 npm run build
 
 # Start production server
@@ -207,56 +268,126 @@ npm start
 
 ### Database Operations
 ```bash
-# Generate Prisma client
+# Generate Prisma client after schema changes
 npx prisma generate
 
-# Create and apply migrations
-npx prisma migrate dev
+# Create new migration
+npx prisma migrate dev --name migration_name
 
-# View database
+# Apply migrations to production
+npx prisma migrate deploy
+
+# Open Prisma Studio (database GUI)
 npx prisma studio
 
-# Reset database
+# Reset database (WARNING: deletes all data)
 npx prisma migrate reset
 
-# Seed database
-npx prisma db seed
+# Seed database with initial data
+npx tsx prisma/seed.ts
 ```
 
-## Security
+### Testing with Postman
 
-- JWT-based authentication
-- Role-based access control (RBAC)
-- Password hashing with bcrypt
-- SQL injection prevention with Prisma ORM
-- Environment variable configuration
+1. **Login to get token**
+   - POST `http://localhost:3000/auth/login`
+   - Body: `{ "username": "admin", "password": "admin123" }`
+
+2. **Test protected route**
+   - GET `http://localhost:3000/protected`
+   - Header: `Authorization: Bearer <your_token>`
+
+## Security Features
+
+- ✅ JWT-based authentication with token expiration (1 day)
+- ✅ Role-based access control (RBAC)
+- ✅ Password hashing with bcrypt (10 salt rounds)
+- ✅ SQL injection prevention with Prisma ORM
+- ✅ Environment variable configuration
+- ✅ Secure token verification middleware
+- ✅ Protected routes requiring authentication
 
 ## Deployment
 
-1. Set production environment variables
+### Prerequisites
+- PostgreSQL database instance
+- Node.js hosting service (Railway, Render, Heroku, AWS, etc.)
+
+### Steps
+1. Set production environment variables on your hosting platform
 2. Build the application: `npm run build`
-3. Configure PostgreSQL production database
-4. Run database migrations on production
-5. Deploy to hosting service (e.g., Heroku, AWS, DigitalOcean, Railway)
+3. Configure PostgreSQL production database connection
+4. Run database migrations: `npx prisma migrate deploy`
+5. Start the server: `npm start`
 
-## Future Enhancements
+### Environment Variables for Production
+```env
+DATABASE_URL=postgresql://user:password@host:5432/database
+JWT_SECRET=your_secure_random_secret
+PORT=3000
+NODE_ENV=production
+```
 
-The following features are planned for future releases:
-- Complete API implementation for all endpoints
-- Frontend application (React-based)
-- Online booking support for customers
-- Online payment gateway integration
-- Multi-hotel management support
-- Advanced analytics and forecasting
-- Mobile application
+## Current Status
+
+### ✅ Completed
+- [x] Database schema design
+- [x] PostgreSQL setup
+- [x] Prisma ORM integration
+- [x] User authentication (login)
+- [x] JWT token generation and verification
+- [x] Password hashing with bcrypt
+- [x] Authentication middleware
+- [x] Database seeding
+- [x] TypeScript configuration
+- [x] ES Modules setup
+
+### 🚧 In Progress
+- [ ] Room management endpoints
+- [ ] Booking system endpoints
+- [ ] Inventory management endpoints
+- [ ] Sales recording endpoints
+- [ ] Payment processing endpoints
+- [ ] Report generation endpoints
+- [ ] Frontend application
+
+### 📋 Planned
+- [ ] Online booking support
+- [ ] Online payment gateway integration
+- [ ] Multi-hotel management
+- [ ] Advanced analytics and forecasting
+- [ ] Mobile application
+- [ ] Real-time notifications
+- [ ] Automated backup system
+
+## Troubleshooting
+
+### Common Issues
+
+**Module not found errors**
+- Make sure to use `.js` extensions in imports (TypeScript with ES modules requirement)
+- Run `npx prisma generate` after schema changes
+
+**Database connection errors**
+- Verify PostgreSQL is running
+- Check DATABASE_URL in `.env` file
+- Ensure database exists: `CREATE DATABASE silverhoch_hms;`
+
+**Seed script errors**
+- Use `npx tsx prisma/seed.ts` instead of `ts-node`
+- Ensure Prisma client is generated first
+
+**EPERM errors on Windows**
+- Stop the development server before running Prisma commands
+- Close Prisma Studio if open
 
 ## Contributing
 
 1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests if applicable
-5. Submit a pull request
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
 ## License
 
@@ -265,4 +396,6 @@ This project is proprietary software developed for Silver HOCH Hotel.
 ---
 
 **Version**: 1.0  
-**Last Updated**: January 24, 2026
+**Status**: Active Development  
+**Last Updated**: January 25, 2026  
+**Author**: DynamiteYt6

@@ -1,4 +1,4 @@
-import prisma from "./lib/prisma.js";
+import prisma from "./lib/prisma";
 import dotenv from "dotenv";
 import app from "./app.js";
 
