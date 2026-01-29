@@ -5,7 +5,8 @@ import { requireAuth } from "./middleware/auth.js";
 import type { AuthRequest } from "./middleware/auth.js";
 import bookingRoutes from "./routes/bookings.js";
 import inventoryRoutes from "./routes/inventory.js";
-
+import reportRoutes from "./routes/reports.js";
+import userRoutes from "./routes/users.js";
 const app = express();
 
 app.use(express.json());
@@ -14,6 +15,8 @@ app.use("/auth", authRoutes);
 app.use("/api/rooms", roomRoutes);
 app.use("/api/bookings", bookingRoutes);
 app.use("/api/inventory", inventoryRoutes);
+app.use("/api/reports", reportRoutes);
+app.use("/api/users", userRoutes);
 app.get("/", (req, res) => {
   res.send("Server is running 🚀");
 });

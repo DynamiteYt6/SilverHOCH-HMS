@@ -41,6 +41,60 @@ Silver HOCH HMS is an internal hotel management system built for a 20-room hotel
 - Excel export functionality
 - Admin-only day locking for read-only historical data
 
+## Implemented Features
+
+🔐 **Authentication & Authorization**
+- ✅ JWT-based login system
+- ✅ Role-based access control (4 roles)
+- ✅ Password hashing with bcrypt
+- ✅ Protected routes with middleware
+
+🏨 **Room Management**
+- ✅ View all rooms (sorted by floor/number)
+- ✅ View single room details
+- ✅ Update room status
+- ✅ Automatic status transitions (AVAILABLE → OCCUPIED → CLEANING)
+
+📅 **Booking System**
+- ✅ Create bookings (overnight & short stay)
+- ✅ Automatic pricing based on room type
+- ✅ Checkout functionality
+- ✅ Business rules validation
+- ✅ Database transactions for data integrity
+
+💰 **Payment Management**
+- ✅ Payment records linked to bookings
+- ✅ Payment status tracking (PENDING → PAID)
+- ✅ Multiple payment methods (CASH/POS/TRANSFER)
+- ✅ View all payments with booking details
+
+📦 **Inventory & Sales**
+- ✅ Create inventory items (drinks, condoms)
+- ✅ Record sales with payment methods
+- ✅ Automatic stock reduction
+- ✅ Role-based selling permissions (drinks seller can only sell drinks)
+- ✅ Sales history tracking
+
+👥 **User Management**
+- ✅ Create new staff members
+- ✅ Update user info
+- ✅ Deactivate users
+- ✅ Change passwords
+- ✅ View all users
+
+📊 **Reports & Analytics**
+- ✅ Daily revenue summary
+- ✅ Payment breakdown by method (CASH/POS/TRANSFER)
+- ✅ Sales by category (DRINKS/CONDOMS)
+- ✅ Booking and sales counts
+- ✅ Business day locking mechanism
+
+🔒 **Business Day Control**
+- ✅ Automatic business day creation
+- ✅ Lock days for end-of-day reconciliation
+- ✅ Prevent modifications to locked days
+- ✅ Track who confirmed each day
+
 ## Tech Stack
 
 ### Backend
@@ -136,9 +190,17 @@ SilverHOCH-HMS/
 │   │   │   ├── jwt.ts          # JWT token generation & verification
 │   │   │   └── prisma.ts       # Prisma client instance
 │   │   ├── middleware/
-│   │   │   └── auth.ts         # JWT authentication middleware
+│   │   │   ├── auth.ts         # JWT authentication middleware
+│   │   │   ├── middleware.ts   # Additional middleware utilities
+│   │   │   └── roles.ts        # Role-based access control middleware
 │   │   ├── routes/
-│   │   │   └── auth.ts         # Authentication routes (login)
+│   │   │   ├── auth.ts         # Authentication routes (login)
+│   │   │   ├── bookings.ts     # Booking management endpoints
+│   │   │   ├── inventory.ts    # Inventory and sales management
+│   │   │   ├── payment.ts      # Payment processing endpoints
+│   │   │   ├── reports.ts      # Reporting and analytics
+│   │   │   ├── rooms.ts        # Room management endpoints
+│   │   │   └── users.ts        # User management endpoints
 │   │   ├── app.ts              # Express app configuration
 │   │   └── server.ts           # Server entry point
 │   ├── .env                    # Environment variables (not in repo)
@@ -198,27 +260,76 @@ Authorization: Bearer <your_jwt_token>
     }
     ```
 
-### Rooms (Coming Soon)
-- `GET /api/rooms` - Get all rooms
-- `GET /api/rooms/:id` - Get room details
+### Rooms
+- `GET /api/rooms` - Get all rooms (sorted by floor/number)
+  - **Auth**: Required (SUPER_ADMIN, ADMIN, FRONT_DESK)
+  - **Response**: Array of room objects
+- `GET /api/rooms/:id` - Get single room details
+  - **Auth**: Required (SUPER_ADMIN, ADMIN, FRONT_DESK)
+  - **Response**: Room object
 - `PATCH /api/rooms/:id/status` - Update room status
+  - **Auth**: Required (SUPER_ADMIN, ADMIN, FRONT_DESK)
+  - **Body**: `{ "status": "AVAILABLE|OCCUPIED|CLEANING|RESERVED" }`
+  - **Response**: Updated room object
 
-### Bookings (Coming Soon)
-- `POST /api/bookings` - Create booking
+### Bookings
+- `POST /api/bookings` - Create a new booking
+  - **Auth**: Required (SUPER_ADMIN, ADMIN, FRONT_DESK)
+  - **Body**: `{ "roomId": "uuid", "stayType": "OVERNIGHT|SHORT_STAY", "paymentMethod": "CASH|POS|TRANSFER" }`
+  - **Response**: Complete booking object with payment
 - `GET /api/bookings` - Get all bookings
-- `GET /api/bookings/:id` - Get booking details
+  - **Auth**: Required
+  - **Response**: Array of booking objects with room and payment details
+- `GET /api/bookings/:id` - Get single booking details
+  - **Auth**: Required
+  - **Response**: Complete booking object
 - `PATCH /api/bookings/:id/checkout` - Checkout booking
-- `PATCH /api/bookings/:id/payment` - Update payment status
+  - **Auth**: Required (SUPER_ADMIN, ADMIN, FRONT_DESK)
+  - **Response**: Updated booking object
 
-### Inventory (Coming Soon)
-- `GET /api/inventory` - Get inventory items
-- `POST /api/inventory/sale` - Record sale
-- `PATCH /api/inventory/:id` - Update inventory quantity
+### Payments
+- `PATCH /api/payments/:id/status` - Update payment status
+  - **Auth**: Required (SUPER_ADMIN, ADMIN, FRONT_DESK)
+  - **Body**: `{ "status": "PAID|PENDING" }`
+  - **Response**: Updated payment object
+- `GET /api/payments` - Get all payments
+  - **Auth**: Required (SUPER_ADMIN, ADMIN, FRONT_DESK)
+  - **Response**: Array of payment objects with booking details
 
-### Reports (Coming Soon)
-- `GET /api/reports/daily` - Get daily summary
-- `POST /api/reports/eod` - Confirm end-of-day
-- `GET /api/reports/export` - Export to Excel
+### Inventory
+- `GET /api/inventory` - Get all inventory items
+  - **Auth**: Required
+  - **Response**: Array of inventory items
+- `POST /api/inventory` - Create inventory item
+  - **Auth**: Required (SUPER_ADMIN, ADMIN)
+  - **Body**: `{ "name": "string", "category": "DRINK|CONDOM", "quantity": number, "price": number }`
+  - **Response**: Created inventory item
+- `POST /api/inventory/sale` - Record a sale
+  - **Auth**: Required
+  - **Body**: `{ "itemId": "uuid", "quantity": number, "paymentMethod": "CASH|POS|TRANSFER" }`
+  - **Response**: Sale record
+- `GET /api/inventory/sales` - Get all sales
+  - **Auth**: Required
+  - **Response**: Array of sale records
+
+### Users
+- `GET /api/users` - Get all users
+  - **Auth**: Required (SUPER_ADMIN, ADMIN)
+  - **Response**: Array of user objects
+- `POST /api/users` - Create new user
+  - **Auth**: Required (SUPER_ADMIN, ADMIN)
+  - **Body**: `{ "name": "string", "username": "string", "password": "string", "role": "SUPER_ADMIN|ADMIN|FRONT_DESK|DRINKS_SELLER" }`
+  - **Response**: Created user object
+
+### Reports
+- `GET /api/reports/daily` - Get daily summary report
+  - **Auth**: Required (SUPER_ADMIN, ADMIN)
+  - **Query**: `?date=YYYY-MM-DD` (optional, defaults to today)
+  - **Response**: Daily revenue summary with breakdowns
+- `POST /api/reports/lock-day` - Lock business day
+  - **Auth**: Required (SUPER_ADMIN, ADMIN)
+  - **Body**: `{ "date": "YYYY-MM-DD" }`
+  - **Response**: Confirmation of locked day
 
 ## Database Schema
 
@@ -341,14 +452,15 @@ NODE_ENV=production
 - [x] Database seeding
 - [x] TypeScript configuration
 - [x] ES Modules setup
+- [x] Room management endpoints
+- [x] Booking system endpoints
+- [x] Inventory management endpoints
+- [x] Sales recording endpoints
+- [x] Payment processing endpoints
+- [x] Report generation endpoints
+- [x] User management endpoints
 
 ### 🚧 In Progress
-- [ ] Room management endpoints
-- [ ] Booking system endpoints
-- [ ] Inventory management endpoints
-- [ ] Sales recording endpoints
-- [ ] Payment processing endpoints
-- [ ] Report generation endpoints
 - [ ] Frontend application
 
 ### 📋 Planned
@@ -395,7 +507,7 @@ This project is proprietary software developed for Silver HOCH Hotel.
 
 ---
 
-**Version**: 1.0  
-**Status**: Active Development  
-**Last Updated**: January 25, 2026  
+**Version**: 1.0
+**Status**: Backend Complete - Frontend In Progress
+**Last Updated**: January 29, 2024
 **Author**: DynamiteYt6
