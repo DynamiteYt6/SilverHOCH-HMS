@@ -1,0 +1,268 @@
+import { Router } from "express";
+import prisma from "../lib/prisma.js";
+import { requireAuth } from "../middleware/auth.js";
+import { requireRole } from "../middleware/roles.js";
+import { UserRole, StayType, BookingSource, PaymentStatus, PaymentMethod, RoomStatus } from "@prisma/client";
+import type { AuthRequest } from "../middleware/auth.js";
+
+const router = Router();
+
+// ============================================
+// POST /api/bookings - Create a new booking
+// ============================================
+router.post(
+  "/",
+  requireAuth,
+  requireRole(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.FRONT_DESK),
+  async (req: AuthRequest, res) => {
+    try {
+      const { roomId, stayType, paymentMethod } = req.body;
+
+      // Validation
+      if (!roomId || !stayType || !paymentMethod) {
+        return res.status(400).json({ 
+          message: "roomId, stayType, and paymentMethod are required" 
+        });
+      }
+
+      // Check if room exists and is available
+      const room = await prisma.room.findUnique({
+        where: { id: roomId }
+      });
+
+      if (!room) {
+        return res.status(404).json({ message: "Room not found" });
+      }
+
+      if (room.status !== RoomStatus.AVAILABLE) {
+        return res.status(400).json({ 
+          message: `Room is ${room.status}, not available for booking` 
+        });
+      }
+
+      // Calculate price based on room type and stay type
+      let price: number;
+      if (room.type === "FAN") {
+        price = stayType === StayType.OVERNIGHT ? 10000 : 4000;
+      } else {
+        // AC room
+        price = stayType === StayType.OVERNIGHT ? 20000 : 10000;
+      }
+
+      // Calculate times
+      const checkIn = new Date();
+      let checkOut: Date | null = null;
+      let shortStayEnd: Date | null = null;
+
+      if (stayType === StayType.SHORT_STAY) {
+        // Short stay = 90 minutes from now
+        shortStayEnd = new Date(checkIn.getTime() + 90 * 60 * 1000);
+      }
+      // For overnight, checkOut is set when they actually check out
+
+      // Get or create today's business day
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      let businessDay = await prisma.businessDay.findUnique({
+        where: { date: today }
+      });
+
+      if (!businessDay) {
+        businessDay = await prisma.businessDay.create({
+          data: { date: today }
+        });
+      }
+
+      // Check if business day is locked
+      if (businessDay.isLocked) {
+        return res.status(400).json({ 
+          message: "Cannot create booking: Business day is locked" 
+        });
+      }
+
+      // Create booking with payment in a transaction
+      const booking = await prisma.$transaction(async (tx) => {
+        // Create the booking
+        const newBooking = await tx.booking.create({
+          data: {
+            roomId,
+            stayType,
+            source: BookingSource.WALK_IN,
+            checkIn,
+            checkOut,
+            shortStayEnd,
+            price,
+            createdById: req.user!.id,
+            businessDayId: businessDay.id,
+          },
+          include: {
+            room: true,
+            payment: true,
+          }
+        });
+
+        // Create payment record
+        await tx.payment.create({
+          data: {
+            bookingId: newBooking.id,
+            amount: price,
+            method: paymentMethod,
+            status: PaymentStatus.PENDING,
+          }
+        });
+
+        // Update room status to OCCUPIED
+        await tx.room.update({
+          where: { id: roomId },
+          data: { status: RoomStatus.OCCUPIED }
+        });
+
+        return newBooking;
+      });
+
+      // Fetch the complete booking with payment
+      const completeBooking = await prisma.booking.findUnique({
+        where: { id: booking.id },
+        include: {
+          room: true,
+          payment: true,
+          createdBy: {
+            select: { id: true, name: true, role: true }
+          }
+        }
+      });
+
+      res.status(201).json(completeBooking);
+
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ message: "Failed to create booking" });
+    }
+  }
+);
+
+// ============================================
+// GET /api/bookings - Get all bookings
+// ============================================
+router.get("/", requireAuth, async (req, res) => {
+  try {
+    const bookings = await prisma.booking.findMany({
+      include: {
+        room: true,
+        payment: true,
+        createdBy: {
+          select: { id: true, name: true, role: true }
+        }
+      },
+      orderBy: { createdAt: "desc" }
+    });
+
+    res.json(bookings);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Failed to fetch bookings" });
+  }
+});
+
+// ============================================
+// GET /api/bookings/:id - Get single booking
+// ============================================
+router.get("/:id", requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!id || Array.isArray(id)) {
+      return res.status(400).json({ message: "Invalid booking ID" });
+    }
+
+    const booking = await prisma.booking.findUnique({
+      where: { id },
+      include: {
+        room: true,
+        payment: true,
+        createdBy: {
+          select: { id: true, name: true, role: true }
+        }
+      }
+    });
+
+    if (!booking) {
+      return res.status(404).json({ message: "Booking not found" });
+    }
+
+    res.json(booking);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Failed to fetch booking" });
+  }
+});
+
+// ============================================
+// PATCH /api/bookings/:id/checkout - Checkout
+// ============================================
+router.patch(
+  "/:id/checkout",
+  requireAuth,
+  requireRole(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.FRONT_DESK),
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+
+      if (!id || Array.isArray(id)) {
+        return res.status(400).json({ message: "Invalid booking ID" });
+      }
+
+      // Get the booking
+      const booking = await prisma.booking.findUnique({
+        where: { id },
+        include: { room: true, payment: true }
+      });
+
+      if (!booking) {
+        return res.status(404).json({ message: "Booking not found" });
+      }
+
+      if (booking.checkOut) {
+        return res.status(400).json({ message: "Booking already checked out" });
+      }
+
+      // Checkout in a transaction
+      const updated = await prisma.$transaction(async (tx) => {
+        // Update booking
+        const updatedBooking = await tx.booking.update({
+          where: { id },
+          data: { checkOut: new Date() }
+        });
+
+        // Update room status to CLEANING
+        await tx.room.update({
+          where: { id: booking.roomId },
+          data: { status: RoomStatus.CLEANING }
+        });
+
+        return updatedBooking;
+      });
+
+      // Fetch complete updated booking
+      const completeBooking = await prisma.booking.findUnique({
+        where: { id: updated.id },
+        include: {
+          room: true,
+          payment: true,
+          createdBy: {
+            select: { id: true, name: true, role: true }
+          }
+        }
+      });
+
+      res.json(completeBooking);
+
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ message: "Failed to checkout booking" });
+    }
+  }
+);
+
+export default router;

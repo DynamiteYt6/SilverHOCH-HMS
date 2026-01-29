@@ -164,6 +164,7 @@
 
     quantity   Int
     totalPrice Int
+    paymentMethod PaymentMethod @default(CASH)
 
     soldBy   User   @relation(fields: [soldById], references: [id])
     soldById String
