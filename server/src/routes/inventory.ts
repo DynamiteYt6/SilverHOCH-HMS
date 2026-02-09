@@ -1,4 +1,6 @@
 import { Router } from "express";
+import fs from "fs";
+import path from "path";
 import prisma from "../lib/prisma.js";
 import { requireAuth } from "../middleware/auth.js";
 import { requireRole } from "../middleware/roles.js";
@@ -6,6 +8,7 @@ import { UserRole, InventoryCategory } from "@prisma/client";
 import type { AuthRequest } from "../middleware/auth.js";
 
 const router = Router();
+const uploadDir = path.join(process.cwd(), "uploads", "inventory");
 
 // ============================================
 // GET /api/inventory - Get all inventory items
@@ -31,7 +34,7 @@ router.post(
   requireRole(UserRole.SUPER_ADMIN, UserRole.ADMIN),
   async (req, res) => {
     try {
-      const { name, category, quantity, price } = req.body;
+      const { name, category, quantity, price, imageUrl } = req.body;
 
       if (!name || !category || quantity === undefined || !price) {
         return res.status(400).json({ 
@@ -40,13 +43,79 @@ router.post(
       }
 
       const item = await prisma.inventoryItem.create({
-        data: { name, category, quantity, price }
+        data: { name, category, quantity, price, imageUrl }
       });
 
       res.status(201).json(item);
     } catch (error) {
       console.error(error);
       res.status(500).json({ message: "Failed to create inventory item" });
+    }
+  }
+);
+
+// ============================================
+// POST /api/inventory/:id/image - Upload inventory item image
+// ============================================
+router.post(
+  "/:id/image",
+  requireAuth,
+  requireRole(
+    UserRole.SUPER_ADMIN,
+    UserRole.ADMIN,
+    UserRole.DRINKS_SELLER,
+    UserRole.FRONT_DESK
+  ),
+  async (req, res) => {
+    try {
+      const { imageData, fileName } = req.body;
+
+      if (!imageData || typeof imageData !== "string") {
+        return res.status(400).json({ message: "Image data is required" });
+      }
+
+      const matches = imageData.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/);
+      if (!matches) {
+        return res.status(400).json({ message: "Invalid image data format" });
+      }
+
+      const item = await prisma.inventoryItem.findUnique({
+        where: { id: req.params.id }
+      });
+
+      if (!item) {
+        return res.status(404).json({ message: "Item not found" });
+      }
+
+      const mimeType = matches[1];
+      const base64Data = matches[2];
+      const extensionFromMime = mimeType.split("/")[1] || "jpg";
+      const providedExtension = fileName ? path.extname(fileName) : "";
+      const safeExtension = (providedExtension || `.${extensionFromMime}`)
+        .replace(/[^a-zA-Z0-9.]/g, "")
+        .toLowerCase();
+
+      const safeName = `${Date.now()}-${Math.round(Math.random() * 1e9)}${safeExtension}`;
+      const imageBuffer = Buffer.from(base64Data, "base64");
+
+      if (imageBuffer.length > 5 * 1024 * 1024) {
+        return res.status(400).json({ message: "Image must be 5MB or smaller" });
+      }
+
+      fs.mkdirSync(uploadDir, { recursive: true });
+      fs.writeFileSync(path.join(uploadDir, safeName), imageBuffer);
+
+      const imageUrl = `/uploads/inventory/${safeName}`;
+
+      const updatedItem = await prisma.inventoryItem.update({
+        where: { id: req.params.id },
+        data: { imageUrl }
+      });
+
+      res.status(200).json(updatedItem);
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ message: "Failed to upload inventory image" });
     }
   }
 );

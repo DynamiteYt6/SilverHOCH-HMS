@@ -6,6 +6,7 @@ import DashboardPage from './pages/DashboardPage';
 import RoomsPage from './pages/RoomsPage';
 import BookingsPage from './pages/BookingsPage';
 import InventoryPage from './pages/InventoryPage';
+import ReportsPage from './pages/ReportsPage';
 import SettingsPage from './pages/SettingsPage';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -55,6 +56,14 @@ function App() {
               element={
                 <ProtectedRoute>
                   <InventoryPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/reports"
+              element={
+                <ProtectedRoute>
+                  <ReportsPage />
                 </ProtectedRoute>
               }
             />
