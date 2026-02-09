@@ -9,10 +9,10 @@ interface ThemeContextType {
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  // Check localStorage or default to dark
+  // Check localStorage or default to light
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
     const saved = localStorage.getItem('theme');
-    return (saved as 'light' | 'dark') || 'dark';
+    return (saved as 'light' | 'dark') || 'light';
   });
 
   // Update document class when theme changes

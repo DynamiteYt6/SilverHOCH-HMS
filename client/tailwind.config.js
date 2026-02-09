@@ -8,7 +8,7 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['Manrope', 'sans-serif'], // Set Manrope as default font
+        sans: ['Raleway', 'sans-serif'], // Set Raleway as default font
       },
     },
   },

@@ -71,13 +71,13 @@ export default function Login() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
               </svg>
             </div>
-            <h2 className="text-gray-900 dark:text-white text-xl font-extrabold tracking-tight">SILVER HOCH</h2>
+            <h2 className="text-gray-900 dark:text-white text-xl font-semibold tracking-tight">SILVER HOCH</h2>
             <div className="h-1 w-8 bg-blue-600 rounded-full"></div>
           </div>
 
           {/* Header Section */}
           <div className="flex flex-col gap-2 text-center">
-            <h1 className="text-gray-900 dark:text-white text-3xl font-black leading-tight">Welcome Back</h1>
+            <h1 className="text-gray-900 dark:text-white text-3xl font-bold leading-tight">Welcome Back</h1>
             <p className="text-gray-600 dark:text-gray-400 text-sm">Please enter your credentials to access the management portal.</p>
           </div>
 
@@ -154,7 +154,7 @@ export default function Login() {
                 />
                 <span className="text-gray-600 dark:text-gray-400 text-xs font-medium group-hover:text-gray-900 dark:group-hover:text-white transition-colors">Remember me</span>
               </label>
-              <a href="#" className="text-blue-600 text-xs font-bold hover:underline">Forgot Password?</a>
+              <a href="#" className="text-blue-600 text-xs font-medium hover:underline">Forgot Password?</a>
             </div>
 
             {/* Login Button */}
@@ -162,7 +162,7 @@ export default function Login() {
               <button
                 type="submit"
                 disabled={isLoading}
-                className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg transition-all shadow-lg shadow-blue-600/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-all shadow-lg shadow-blue-600/20 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isLoading ? 'Logging in...' : 'Secure Login'}
               </button>
@@ -171,7 +171,7 @@ export default function Login() {
 
           {/* Footer Section */}
           <div className="flex flex-col items-center gap-4 mt-2">
-            <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400 text-[10px] uppercase tracking-widest font-bold">
+            <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400 text-[10px] uppercase tracking-widest font-medium">
               <svg className="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M2.166 4.999A11.954 11.954 0 0010 1.944 11.954 11.954 0 0017.834 5c.11.65.166 1.32.166 2.001 0 5.225-3.34 9.67-8 11.317C5.34 16.67 2 12.225 2 7c0-.682.057-1.35.166-2.001zm11.541 3.708a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
               </svg>
@@ -179,7 +179,7 @@ export default function Login() {
             </div>
             <div className="h-[1px] w-full bg-gray-300 dark:bg-gray-700/50"></div>
             <p className="text-gray-600 dark:text-gray-400 text-xs">
-              Need help? <a href="#" className="text-gray-900 dark:text-white hover:text-blue-600 transition-colors font-bold underline underline-offset-4">Contact IT Support</a>
+              Need help? <a href="#" className="text-gray-900 dark:text-white hover:text-blue-600 transition-colors font-medium underline underline-offset-4">Contact IT Support</a>
             </p>
           </div>
         </div>

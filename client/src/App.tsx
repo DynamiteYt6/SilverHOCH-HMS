@@ -2,9 +2,10 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 import Login from './pages/Login';
-import DashboardPage from './pages/DashboardPage'; // Add this
+import DashboardPage from './pages/DashboardPage';
 import RoomsPage from './pages/RoomsPage';
 import BookingsPage from './pages/BookingsPage';
+import InventoryPage from './pages/InventoryPage';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth();
@@ -48,7 +49,14 @@ function App() {
                 </ProtectedRoute>
               }
             />
-
+            <Route
+              path="/inventory"
+              element={
+                <ProtectedRoute>
+                  <InventoryPage />
+                </ProtectedRoute>
+              }
+            />
           </Routes>
         </BrowserRouter>
       </AuthProvider>
