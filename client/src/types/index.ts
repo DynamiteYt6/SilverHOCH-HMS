@@ -24,6 +24,7 @@ export interface InventoryItem {
   category: 'DRINK' | 'CONDOM';
   quantity: number;
   price: number;
+  imageUrl?: string | null;
   createdAt: string;
 }
 
