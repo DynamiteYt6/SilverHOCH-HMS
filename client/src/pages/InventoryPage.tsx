@@ -181,11 +181,6 @@ export default function InventoryPage() {
   const handleImageUpload = async (itemId: string, file?: File) => {
     if (!file) return;
 
-    if (file.size > 5 * 1024 * 1024) {
-      setError('Image must be 5MB or smaller.');
-      return;
-    }
-
     try {
       setUploadingItemId(itemId);
       setError(null);
