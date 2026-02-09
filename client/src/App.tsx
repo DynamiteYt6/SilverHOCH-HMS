@@ -6,6 +6,7 @@ import DashboardPage from './pages/DashboardPage';
 import RoomsPage from './pages/RoomsPage';
 import BookingsPage from './pages/BookingsPage';
 import InventoryPage from './pages/InventoryPage';
+import SettingsPage from './pages/SettingsPage';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth();
@@ -54,6 +55,14 @@ function App() {
               element={
                 <ProtectedRoute>
                   <InventoryPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/settings"
+              element={
+                <ProtectedRoute>
+                  <SettingsPage />
                 </ProtectedRoute>
               }
             />

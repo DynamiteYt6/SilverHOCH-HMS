@@ -3,22 +3,24 @@ import Layout from '../components/Layout';
 import api from '../services/api';
 import type { InventoryItem, Sale, PaymentMethod } from '../types';
 
+interface CartItem {
+  item: InventoryItem;
+  quantity: number;
+}
+
 export default function InventoryPage() {
-  // Data states
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [sales, setSales] = useState<Sale[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
-  // Sale form states
-  const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null);
-  const [quantity, setQuantity] = useState(1);
+  // Cart for multiple items
+  const [cart, setCart] = useState<CartItem[]>([]);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('CASH');
   const [searchQuery, setSearchQuery] = useState('');
   const [isProcessingSale, setIsProcessingSale] = useState(false);
   const [saleSuccess, setSaleSuccess] = useState(false);
 
-  // Fetch inventory and sales data
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -26,8 +28,8 @@ export default function InventoryPage() {
         setError(null);
         
         const [inventoryRes, salesRes] = await Promise.all([
-          api.get<InventoryItem[]>('/inventory'),
-          api.get<Sale[]>('/inventory/sales')
+          api.get<InventoryItem[]>('/api/inventory'),
+          api.get<Sale[]>('/api/inventory/sales')
         ]);
         
         setInventory(inventoryRes.data);
@@ -43,35 +45,65 @@ export default function InventoryPage() {
     fetchData();
   }, []);
 
-  // Handle sale processing
+  // Add item to cart
+  const addToCart = (item: InventoryItem) => {
+    const existingItem = cart.find(ci => ci.item.id === item.id);
+    if (existingItem) {
+      setCart(cart.map(ci => 
+        ci.item.id === item.id 
+          ? { ...ci, quantity: ci.quantity + 1 }
+          : ci
+      ));
+    } else {
+      setCart([...cart, { item, quantity: 1 }]);
+    }
+  };
+
+  // Remove from cart
+  const removeFromCart = (itemId: number) => {
+    setCart(cart.filter(ci => ci.item.id !== itemId));
+  };
+
+  // Update cart quantity
+  const updateQuantity = (itemId: number, quantity: number) => {
+    if (quantity < 1) {
+      removeFromCart(itemId);
+    } else {
+      setCart(cart.map(ci =>
+        ci.item.id === itemId ? { ...ci, quantity } : ci
+      ));
+    }
+  };
+
+  // Process sale
   const handleProcessSale = async () => {
-    if (!selectedItem || quantity < 1) return;
+    if (cart.length === 0) return;
 
     try {
       setIsProcessingSale(true);
       setError(null);
 
-      await api.post('/inventory/sale', {
-        itemId: selectedItem.id,
-        quantity,
-        paymentMethod
-      });
+      // Process each item in cart
+      for (const cartItem of cart) {
+        await api.post('/api/inventory/sale', {
+          itemId: cartItem.item.id,
+          quantity: cartItem.quantity,
+          paymentMethod
+        });
+      }
 
-      // Reset form and show success
       setSaleSuccess(true);
-      setSelectedItem(null);
-      setQuantity(1);
+      setCart([]);
       
       // Refresh data
       const [inventoryRes, salesRes] = await Promise.all([
-        api.get<InventoryItem[]>('/inventory'),
-        api.get<Sale[]>('/inventory/sales')
+        api.get<InventoryItem[]>('/api/inventory'),
+        api.get<Sale[]>('/api/inventory/sales')
       ]);
       
       setInventory(inventoryRes.data);
       setSales(salesRes.data);
 
-      // Hide success message after 3 seconds
       setTimeout(() => setSaleSuccess(false), 3000);
     } catch (err: any) {
       console.error('Sale failed:', err);
@@ -81,33 +113,22 @@ export default function InventoryPage() {
     }
   };
 
-  // Select item from grid
-  const handleSelectItem = (item: InventoryItem) => {
-    setSelectedItem(item);
-    setQuantity(1);
-    setSaleSuccess(false);
-    setError(null);
-  };
-
   // Calculate totals
-  const subtotal = selectedItem ? selectedItem.price * quantity : 0;
+  const subtotal = cart.reduce((sum, ci) => sum + (ci.item.price * ci.quantity), 0);
   const tax = 0;
   const total = subtotal + tax;
 
-  // Filter items based on search
   const filteredItems = inventory.filter(item =>
     item.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  // Format currency (Nigerian Naira)
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-NG', {
       style: 'currency',
       currency: 'NGN'
-    }).format(amount / 100);
+    }).format(amount);
   };
 
-  // Format time
   const formatTime = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleTimeString('en-US', { 
@@ -117,53 +138,42 @@ export default function InventoryPage() {
     });
   };
 
-  // Get stock status badge
   const getStockBadge = (qty: number) => {
     if (qty <= 5) {
       return (
-        <span className="bg-rose-500 text-white px-2 py-0.5 rounded text-xs font-bold uppercase">
+        <span className="bg-rose-500 text-white px-2 py-0.5 rounded text-xs font-bold">
           Critical
         </span>
       );
     } else if (qty <= 10) {
       return (
-        <span className="bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 px-2 py-0.5 rounded text-xs font-bold uppercase">
-          Restock Soon
+        <span className="bg-amber-500 text-white px-2 py-0.5 rounded text-xs font-bold">
+          Low
         </span>
       );
     }
     return (
-      <span className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 px-2 py-0.5 rounded text-xs font-bold uppercase">
-        Stable
+      <span className="bg-emerald-500 text-white px-2 py-0.5 rounded text-xs font-bold">
+        In Stock
       </span>
     );
   };
 
-  // Get stock status color for trend
-  const getStockStatus = (qty: number) => {
-    if (qty <= 5) return 'text-rose-500';
-    if (qty <= 10) return 'text-rose-500';
-    return 'text-emerald-500';
-  };
-
-  // Get stock trend icon
-  const getStockTrend = (qty: number) => {
-    if (qty <= 5) return 'error';
-    if (qty <= 10) return 'trending_down';
-    return 'check_circle';
-  };
-
-  // Get stock trend text
-  const getStockTrendText = (qty: number) => {
-    if (qty <= 5) return 'Reorder immediate threshold reached';
-    if (qty <= 10) return '-15% from yesterday';
-    return 'Sufficient stock levels';
+  // Get item image
+  const getItemImage = (item: InventoryItem) => {
+    // Placeholder images based on category
+    const imageMap: Record<string, string> = {
+      DRINK: 'https://images.unsplash.com/photo-1437418747212-8d9709afab22?w=200&h=200&fit=crop',
+      CONDOM: 'https://images.unsplash.com/photo-1556228578-0d85b1a4d571?w=200&h=200&fit=crop',
+      SNACK: 'https://images.unsplash.com/photo-1599490659213-e2b9527bd087?w=200&h=200&fit=crop',
+    };
+    return imageMap[item.category] || 'https://images.unsplash.com/photo-1580913428023-ec4dc7e4f7f4?w=200&h=200&fit=crop';
   };
 
   if (isLoading) {
     return (
       <Layout>
-        <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-[#101622]">
+        <div className="min-h-screen flex items-center justify-center">
           <div className="flex flex-col items-center gap-4">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
             <p className="text-gray-600 dark:text-gray-400">Loading inventory...</p>
@@ -175,294 +185,245 @@ export default function InventoryPage() {
 
   return (
     <Layout>
-      {/* Error Message */}
+      <style>{`
+        /* Custom Scrollbar */
+        .custom-scrollbar::-webkit-scrollbar {
+          width: 8px;
+          height: 8px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: rgba(59, 130, 246, 0.3);
+          border-radius: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+          background: rgba(59, 130, 246, 0.5);
+        }
+        .dark .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: rgba(59, 130, 246, 0.2);
+        }
+        .dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+          background: rgba(59, 130, 246, 0.4);
+        }
+      `}</style>
+
       {error && (
-        <div className="mb-6 p-4 bg-red-500/10 border border-red-500/50 text-red-600 dark:text-red-400 rounded-lg">
+        <div className="mb-4 p-4 bg-red-500/10 border border-red-500/50 text-red-600 dark:text-red-400 rounded-lg">
           {error}
         </div>
       )}
 
-      {/* Success Message */}
       {saleSuccess && (
-        <div className="mb-6 p-4 bg-emerald-500/10 border border-emerald-500/50 text-emerald-600 dark:text-emerald-400 rounded-lg flex items-center gap-2">
-          <span className="material-symbols-outlined">check_circle</span>
+        <div className="mb-4 p-4 bg-emerald-500/10 border border-emerald-500/50 text-emerald-600 dark:text-emerald-400 rounded-lg flex items-center gap-2">
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+          </svg>
           Sale recorded successfully!
         </div>
       )}
 
-      {/* Page Heading */}
-      <div className="flex flex-wrap justify-between items-end gap-3 mb-6">
-        <div className="flex min-w-72 flex-col gap-1">
-          <h1 className="text-4xl font-bold leading-tight tracking-[-0.033em] text-gray-900 dark:text-white">Inventory & Sales Hub</h1>
-          <p className="text-gray-500 dark:text-[#9da6b9] text-base font-normal">Monitor essential stock and manage counter sales.</p>
+      {/* Header */}
+      <div className="flex justify-between items-center mb-4">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Inventory & Sales</h1>
+          <p className="text-gray-500 dark:text-gray-400 text-sm">Manage stock and process sales</p>
         </div>
-        <div className="flex gap-3">
-          <button className="flex h-10 items-center justify-center rounded-lg px-4 bg-gray-100 dark:bg-[#282e39] font-semibold text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-[#3b4354] transition-colors">
-            <span className="material-symbols-outlined mr-2 text-base">download</span>
-            Export Report
-          </button>
-        </div>
+        <button className="px-4 py-2 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg text-sm font-semibold hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors flex items-center gap-2">
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+          </svg>
+          Export
+        </button>
       </div>
 
-      {/* Low Stock Alerts Section */}
-      <div className="mb-8">
-        <h2 className="text-[20px] font-semibold leading-tight tracking-[-0.015em] mb-4 flex items-center gap-2 text-gray-900 dark:text-white">
-          <span className="material-symbols-outlined text-amber-500">warning</span>
-          Low Stock Alerts
-        </h2>
-        <div className="flex flex-wrap gap-4">
-          {/* Drinks Category */}
-          <div className="flex min-w-[280px] flex-1 flex-col gap-2 rounded-xl p-6 border border-gray-200 dark:border-[#3b4354] bg-white dark:bg-[#101622]/50 shadow-sm">
-            <div className="flex justify-between items-start">
-              <p className="text-gray-500 dark:text-[#9da6b9] text-sm font-medium uppercase tracking-wider">Drinks Category</p>
-              {getStockBadge(inventory.filter(i => i.category === 'DRINK').reduce((sum, item) => sum + item.quantity, 0))}
-            </div>
-            <p className="tracking-light text-3xl font-bold leading-tight text-gray-900 dark:text-white">
-              {inventory.filter(i => i.category === 'DRINK').reduce((sum, item) => sum + item.quantity, 0)} units left
-            </p>
-            <div className={`flex items-center gap-2 text-sm font-semibold ${getStockStatus(inventory.filter(i => i.category === 'DRINK').reduce((sum, item) => sum + item.quantity, 0))}`}>
-              <span className="material-symbols-outlined text-sm">{getStockTrend(inventory.filter(i => i.category === 'DRINK').reduce((sum, item) => sum + item.quantity, 0))}</span>
-              {getStockTrendText(inventory.filter(i => i.category === 'DRINK').reduce((sum, item) => sum + item.quantity, 0))}
-            </div>
-          </div>
-
-          {/* Condoms & Essentials */}
-          <div className="flex min-w-[280px] flex-1 flex-col gap-2 rounded-xl p-6 border-2 border-rose-500/30 bg-rose-50/10 dark:bg-rose-900/10 shadow-sm relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-24 h-24 bg-rose-500/5 -mr-10 -mt-10 rounded-full"></div>
-            <div className="flex justify-between items-start">
-              <p className="text-gray-500 dark:text-[#9da6b9] text-sm font-medium uppercase tracking-wider">Condoms & Essentials</p>
-              {getStockBadge(inventory.filter(i => i.category === 'CONDOM').reduce((sum, item) => sum + item.quantity, 0))}
-            </div>
-            <p className="tracking-light text-3xl font-bold leading-tight text-gray-900 dark:text-white">
-              {inventory.filter(i => i.category === 'CONDOM').reduce((sum, item) => sum + item.quantity, 0)} units left
-            </p>
-            <p className="text-rose-600 dark:text-rose-400 text-sm font-semibold flex items-center gap-1">
-              <span className="material-symbols-outlined text-sm">error</span>
-              Reorder immediate threshold reached
-            </p>
-          </div>
-
-          {/* Toiletries */}
-          <div className="flex min-w-[280px] flex-1 flex-col gap-2 rounded-xl p-6 border border-gray-200 dark:border-[#3b4354] bg-white dark:bg-[#101622]/50 shadow-sm">
-            <div className="flex justify-between items-start">
-              <p className="text-gray-500 dark:text-[#9da6b9] text-sm font-medium uppercase tracking-wider">Toiletries</p>
-              <span className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 px-2 py-0.5 rounded text-xs font-bold uppercase">Stable</span>
-            </div>
-            <p className="tracking-light text-3xl font-bold leading-tight text-gray-900 dark:text-white">
-              {inventory.reduce((sum, item) => sum + item.quantity, 0)} units
-            </p>
-            <div className="flex items-center gap-2 text-emerald-500 text-sm font-semibold">
-              <span className="material-symbols-outlined text-sm">check_circle</span>
-              Sufficient stock levels
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* New Sale Interface */}
-      <div className="mb-10 p-6 rounded-xl border border-gray-200 dark:border-[#3b4354] bg-white dark:bg-[#101622] shadow-md">
-        <h2 className="text-[22px] font-semibold leading-tight tracking-[-0.015em] mb-6 text-gray-900 dark:text-white">Process New Sale</h2>
-        <div className="grid grid-cols-12 gap-8">
-          {/* Left: Search & Select */}
-          <div className="col-span-8 flex flex-col gap-4">
-            <div className="relative">
-              <span className="material-symbols-outlined absolute left-4 top-3 text-gray-400">search</span>
+      {/* Sale Interface */}
+      <div className="mb-6 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-[#1a2130] overflow-hidden">
+        <div className="grid grid-cols-12 gap-0">
+          {/* Items Selection */}
+          <div className="col-span-8 p-4 border-r border-gray-200 dark:border-gray-800">
+            <div className="relative mb-4">
+              <svg className="absolute left-3 top-3 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
               <input 
-                className="w-full pl-12 pr-4 py-3 rounded-lg border border-gray-200 dark:border-[#3b4354] bg-gray-50 dark:bg-[#111318] focus:border-blue-600 focus:ring-1 focus:ring-blue-600 outline-none transition-all text-gray-900 dark:text-white placeholder:text-gray-400" 
-                placeholder="Search item by name or barcode (e.g. 'Heineken', 'Durex')..." 
+                className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 outline-none text-gray-900 dark:text-white text-sm" 
+                placeholder="Search items..." 
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
             
-            {/* Quick Grid Items */}
-            <div className="grid grid-cols-4 gap-3">
-              {filteredItems.slice(0, 8).map((item) => (
+            <div className="grid grid-cols-4 gap-3 max-h-[400px] overflow-y-auto custom-scrollbar pr-2">
+              {filteredItems.map((item) => (
                 <button
                   key={item.id}
-                  onClick={() => handleSelectItem(item)}
-                  className={`flex flex-col items-center p-3 border rounded-lg transition-all group ${
-                    selectedItem?.id === item.id
-                      ? 'border-blue-600 bg-blue-600/5'
-                      : 'border-gray-200 dark:border-[#3b4354] hover:border-blue-600'
-                  }`}
+                  onClick={() => addToCart(item)}
+                  className="flex flex-col p-3 border border-gray-200 dark:border-gray-700 rounded-lg hover:border-blue-600 hover:shadow-md transition-all group bg-white dark:bg-gray-800"
                 >
-                  <div className="w-full aspect-square bg-gray-100 dark:bg-[#282e39] rounded mb-2 flex items-center justify-center overflow-hidden">
-                    <span className="material-symbols-outlined text-4xl text-gray-400">
-                      {item.category === 'DRINK' ? 'local_bar' : 'sanitizer'}
-                    </span>
+                  <div className="w-full aspect-square bg-gray-100 dark:bg-gray-700 rounded mb-2 overflow-hidden">
+                    <img 
+                      src={getItemImage(item)} 
+                      alt={item.name}
+                      className="w-full h-full object-cover group-hover:scale-110 transition-transform"
+                    />
                   </div>
-                  <span className="text-xs font-semibold text-center text-gray-900 dark:text-white">{item.name}</span>
-                  <span className="text-blue-600 text-xs font-bold mt-1">{formatCurrency(item.price)}</span>
+                  <span className="text-xs font-semibold text-gray-900 dark:text-white text-center mb-1">{item.name}</span>
+                  <span className="text-blue-600 text-xs font-bold text-center">{formatCurrency(item.price)}</span>
+                  <div className="mt-1 flex justify-center">
+                    {getStockBadge(item.quantity)}
+                  </div>
                 </button>
               ))}
             </div>
-
-            {/* Available Items List */}
-            <div className="mt-4">
-              <h3 className="text-sm font-semibold text-gray-500 dark:text-[#9da6b9] mb-2">All Items</h3>
-              <div className="max-h-48 overflow-y-auto space-y-1">
-                {filteredItems.map((item) => (
-                  <button
-                    key={item.id}
-                    onClick={() => handleSelectItem(item)}
-                    className={`w-full flex items-center justify-between p-2 rounded-lg text-left transition-colors ${
-                      selectedItem?.id === item.id
-                        ? 'bg-blue-600/10 border border-blue-600'
-                        : 'hover:bg-gray-100 dark:hover:bg-[#282e39]'
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <span className="material-symbols-outlined text-lg text-gray-400">
-                        {item.category === 'DRINK' ? 'local_bar' : 'sanitizer'}
-                      </span>
-                      <span className="text-sm font-medium text-gray-900 dark:text-white">{item.name}</span>
-                      <span className="text-xs text-gray-500 dark:text-[#9da6b9]">({item.quantity} left)</span>
-                    </div>
-                    <span className="text-sm font-semibold text-blue-600">{formatCurrency(item.price)}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
           </div>
 
-          {/* Right: Transaction Details */}
-          <div className="col-span-4 flex flex-col border-l border-gray-200 dark:border-[#3b4354] pl-8">
-            <div className="flex-1 space-y-4">
-              <div>
-                <label className="text-xs font-bold uppercase text-gray-500 dark:text-[#9da6b9] mb-1 block">Quantity</label>
-                <div className="flex items-center">
-                  <button 
-                    onClick={() => setQuantity(q => Math.max(1, q - 1))}
-                    className="w-10 h-10 border border-gray-200 dark:border-[#3b4354] flex items-center justify-center rounded-l hover:bg-gray-50 dark:hover:bg-[#282e39] transition-colors text-gray-600 dark:text-gray-400"
-                  >
-                    -
-                  </button>
-                  <input 
-                    className="w-full h-10 border-y border-x-0 border-gray-200 dark:border-[#3b4354] bg-transparent text-center focus:ring-0 text-gray-900 dark:text-white font-semibold" 
-                    type="number" 
-                    value={quantity}
-                    onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value) || 1))}
-                    min="1"
-                  />
-                  <button 
-                    onClick={() => setQuantity(q => q + 1)}
-                    className="w-10 h-10 border border-gray-200 dark:border-[#3b4354] flex items-center justify-center rounded-r hover:bg-gray-50 dark:hover:bg-[#282e39] transition-colors text-gray-600 dark:text-gray-400"
-                  >
-                    +
-                  </button>
+          {/* Cart & Checkout */}
+          <div className="col-span-4 p-4 flex flex-col">
+            <h3 className="text-sm font-bold text-gray-500 dark:text-gray-400 mb-3">Cart ({cart.length})</h3>
+            
+            <div className="flex-1 space-y-2 max-h-[240px] overflow-y-auto custom-scrollbar pr-2 mb-4">
+              {cart.length === 0 ? (
+                <div className="text-center py-8 text-gray-400 text-sm">
+                  Cart is empty
                 </div>
-              </div>
+              ) : (
+                cart.map((ci) => (
+                  <div key={ci.item.id} className="flex items-center gap-2 p-2 bg-gray-50 dark:bg-gray-800 rounded">
+                    <img 
+                      src={getItemImage(ci.item)} 
+                      alt={ci.item.name}
+                      className="w-10 h-10 object-cover rounded"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-semibold text-gray-900 dark:text-white truncate">{ci.item.name}</p>
+                      <p className="text-xs text-blue-600">{formatCurrency(ci.item.price)}</p>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <button 
+                        onClick={() => updateQuantity(ci.item.id, ci.quantity - 1)}
+                        className="w-6 h-6 flex items-center justify-center rounded bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600"
+                      >
+                        -
+                      </button>
+                      <span className="w-8 text-center text-sm font-semibold text-gray-900 dark:text-white">{ci.quantity}</span>
+                      <button 
+                        onClick={() => updateQuantity(ci.item.id, ci.quantity + 1)}
+                        className="w-6 h-6 flex items-center justify-center rounded bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600"
+                      >
+                        +
+                      </button>
+                    </div>
+                    <button 
+                      onClick={() => removeFromCart(ci.item.id)}
+                      className="text-red-500 hover:text-red-600"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div className="space-y-3">
               <div>
-                <label className="text-xs font-bold uppercase text-gray-500 dark:text-[#9da6b9] mb-1 block">Payment Method</label>
+                <label className="text-xs font-bold text-gray-500 dark:text-gray-400 mb-1 block">Payment</label>
                 <select 
-                  className="w-full rounded-lg border border-gray-200 dark:border-[#3b4354] bg-gray-50 dark:bg-[#111318] h-10 px-3 focus:ring-1 focus:ring-blue-600 outline-none text-gray-900 dark:text-white"
+                  className="w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 h-9 px-3 text-sm focus:ring-1 focus:ring-blue-600 outline-none text-gray-900 dark:text-white"
                   value={paymentMethod}
                   onChange={(e) => setPaymentMethod(e.target.value as PaymentMethod)}
                 >
                   <option value="CASH">Cash</option>
-                  <option value="POS">Credit Card</option>
-                  <option value="TRANSFER">Mobile Money</option>
+                  <option value="POS">POS</option>
+                  <option value="TRANSFER">Transfer</option>
                 </select>
               </div>
-              <div className="bg-gray-50 dark:bg-[#111318] p-4 rounded-lg border border-gray-200 dark:border-[#3b4354]">
-                <div className="flex justify-between items-center mb-1">
-                  <span className="text-sm text-gray-500">Subtotal</span>
-                  <span className="text-sm font-semibold text-gray-900 dark:text-white">{formatCurrency(subtotal)}</span>
+
+              <div className="bg-gray-50 dark:bg-gray-800 p-3 rounded-lg">
+                <div className="flex justify-between text-sm mb-1">
+                  <span className="text-gray-500">Subtotal</span>
+                  <span className="font-semibold text-gray-900 dark:text-white">{formatCurrency(subtotal)}</span>
                 </div>
-                <div className="flex justify-between items-center mb-3">
-                  <span className="text-sm text-gray-500">Tax (0%)</span>
-                  <span className="text-sm font-semibold text-gray-900 dark:text-white">{formatCurrency(tax)}</span>
+                <div className="flex justify-between text-sm mb-2">
+                  <span className="text-gray-500">Tax</span>
+                  <span className="font-semibold text-gray-900 dark:text-white">{formatCurrency(tax)}</span>
                 </div>
-                <div className="border-t border-gray-200 dark:border-[#282e39] pt-3 flex justify-between items-center">
-                  <span className="text-lg font-bold text-gray-900 dark:text-white">Total</span>
-                  <span className="text-2xl font-bold text-blue-600">{formatCurrency(total)}</span>
+                <div className="border-t border-gray-200 dark:border-gray-700 pt-2 flex justify-between">
+                  <span className="font-bold text-gray-900 dark:text-white">Total</span>
+                  <span className="text-xl font-bold text-blue-600">{formatCurrency(total)}</span>
                 </div>
               </div>
+
+              <button 
+                onClick={handleProcessSale}
+                disabled={cart.length === 0 || isProcessingSale}
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-lg flex items-center justify-center gap-2 shadow-lg shadow-blue-600/20 transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                </svg>
+                {isProcessingSale ? 'Processing...' : 'Process Sale'}
+              </button>
             </div>
-            <button 
-              onClick={handleProcessSale}
-              disabled={!selectedItem || quantity < 1 || isProcessingSale}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-4 rounded-xl mt-6 flex items-center justify-center gap-2 shadow-lg shadow-blue-600/20 transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <span className="material-symbols-outlined">point_of_sale</span>
-              {isProcessingSale ? 'Processing...' : 'RECORD SALE'}
-            </button>
           </div>
         </div>
       </div>
 
-      {/* Today's Sales Table */}
-      <div className="flex flex-col gap-4">
-        <div className="flex justify-between items-center">
-          <h2 className="text-[20px] font-semibold leading-tight tracking-[-0.015em] text-gray-900 dark:text-white">Today&apos;s Sales Log</h2>
-          <span className="text-xs bg-gray-100 dark:bg-[#282e39] px-3 py-1 rounded-full text-gray-500 font-medium">Total Volume: {sales.length} Transactions</span>
+      {/* Today's Sales */}
+      <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-[#1a2130] overflow-hidden">
+        <div className="p-4 border-b border-gray-200 dark:border-gray-800 flex justify-between items-center">
+          <h2 className="text-lg font-bold text-gray-900 dark:text-white">Today's Sales</h2>
+          <span className="text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 px-3 py-1 rounded-full font-semibold">
+            {sales.length} transactions
+          </span>
         </div>
-        <div className="overflow-x-auto rounded-xl border border-gray-200 dark:border-[#3b4354]">
-          <table className="w-full text-left border-collapse">
+        <div className="overflow-x-auto custom-scrollbar">
+          <table className="w-full">
             <thead>
-              <tr className="bg-gray-50 dark:bg-[#1c222d] border-b border-gray-200 dark:border-[#3b4354]">
-                <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-[#9da6b9]">Time</th>
-                <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-[#9da6b9]">Item Name</th>
-                <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-[#9da6b9]">Qty</th>
-                <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-[#9da6b9]">Total Price</th>
-                <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-[#9da6b9]">Payment</th>
-                <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-[#9da6b9]">Seller</th>
-                <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-[#9da6b9]">Actions</th>
+              <tr className="bg-gray-50 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-800">
+                <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 dark:text-gray-400">Time</th>
+                <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 dark:text-gray-400">Item</th>
+                <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 dark:text-gray-400">Qty</th>
+                <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 dark:text-gray-400">Total</th>
+                <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 dark:text-gray-400">Payment</th>
+                <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 dark:text-gray-400">Seller</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-200 dark:divide-[#282e39] bg-white dark:bg-[#101622]/30">
+            <tbody className="divide-y divide-gray-200 dark:divide-gray-800">
               {sales.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-8 text-center text-gray-500 dark:text-[#9da6b9]">
-                    No sales recorded today. Start processing transactions above.
+                  <td colSpan={6} className="px-4 py-8 text-center text-gray-500 dark:text-gray-400 text-sm">
+                    No sales recorded today
                   </td>
                 </tr>
               ) : (
                 sales.slice(0, 10).map((sale) => (
-                  <tr key={sale.id} className="hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
-                    <td className="px-6 py-4 text-sm whitespace-nowrap text-gray-900 dark:text-white">{formatTime(sale.createdAt)}</td>
-                    <td className="px-6 py-4 text-sm font-semibold text-gray-900 dark:text-white">{sale.item.name}</td>
-                    <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">{sale.quantity}</td>
-                    <td className="px-6 py-4 text-sm font-bold text-blue-600">{formatCurrency(sale.totalPrice)}</td>
-                    <td className="px-6 py-4 text-sm">
-                      <span className="flex items-center gap-1.5">
-                        <span className={`w-2 h-2 rounded-full ${sale.paymentMethod === 'CASH' ? 'bg-emerald-500' : sale.paymentMethod === 'POS' ? 'bg-purple-500' : 'bg-blue-500'}`}></span>
-                        <span className="text-gray-600 dark:text-gray-400">
-                          {sale.paymentMethod === 'CASH' ? 'Cash' : sale.paymentMethod === 'POS' ? 'Credit Card' : 'Mobile Money'}
-                        </span>
+                  <tr key={sale.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/30">
+                    <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">{formatTime(sale.createdAt)}</td>
+                    <td className="px-4 py-3 text-sm font-semibold text-gray-900 dark:text-white">{sale.item.name}</td>
+                    <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">{sale.quantity}</td>
+                    <td className="px-4 py-3 text-sm font-bold text-blue-600">{formatCurrency(sale.totalPrice)}</td>
+                    <td className="px-4 py-3 text-sm">
+                      <span className={`px-2 py-1 rounded text-xs font-semibold ${
+                        sale.paymentMethod === 'CASH' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' :
+                        sale.paymentMethod === 'POS' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400' :
+                        'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+                      }`}>
+                        {sale.paymentMethod}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">{sale.soldBy.name}</td>
-                    <td className="px-6 py-4 text-sm">
-                      <button className="text-gray-400 hover:text-blue-600 transition-colors">
-                        <span className="material-symbols-outlined text-lg">print</span>
-                      </button>
-                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">{sale.soldBy.name}</td>
                   </tr>
                 ))
               )}
             </tbody>
           </table>
         </div>
-        {sales.length > 10 && (
-          <div className="flex justify-center mt-4">
-            <button className="text-blue-600 text-sm font-semibold hover:underline flex items-center gap-1">
-              Load more transactions
-              <span className="material-symbols-outlined text-sm">expand_more</span>
-            </button>
-          </div>
-        )}
       </div>
-
-      {/* Material Symbols CSS */}
-      <style>{`
-        .material-symbols-outlined {
-          font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
-        }
-      `}</style>
     </Layout>
   );
 }
-
