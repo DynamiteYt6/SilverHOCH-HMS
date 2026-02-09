@@ -1,5 +1,6 @@
 import express from "express";
 import cors from "cors";  
+import path from "path";
 import authRoutes from "./routes/auth.js";
 import roomRoutes from "./routes/rooms.js";
 import bookingRoutes from "./routes/bookings.js";
@@ -12,7 +13,8 @@ import type { AuthRequest } from "./middleware/auth.js";
 const app = express();
 
 app.use(cors());  
-app.use(express.json());
+app.use(express.json({ limit: "10mb" }));
+app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
 
 // Routes
 app.use("/auth", authRoutes);
