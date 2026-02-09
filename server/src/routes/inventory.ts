@@ -60,7 +60,12 @@ router.post(
 router.post(
   "/:id/image",
   requireAuth,
-  requireRole(UserRole.SUPER_ADMIN, UserRole.ADMIN),
+  requireRole(
+    UserRole.SUPER_ADMIN,
+    UserRole.ADMIN,
+    UserRole.DRINKS_SELLER,
+    UserRole.FRONT_DESK
+  ),
   async (req, res) => {
     try {
       const { imageData, fileName } = req.body;
