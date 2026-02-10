@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import Layout from '../components/Layout';
 import api from '../services/api';
 import type { Room } from '../types';
@@ -24,19 +25,48 @@ export default function BookingsPage() {
   const [rooms, setRooms] = useState<Room[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [searchParams] = useSearchParams();
+  const [pricingSettings, setPricingSettings] = useState({
+    fanOvernightPrice: 10000,
+    fanShortStayPrice: 4000,
+    acOvernightPrice: 20000,
+    acShortStayPrice: 10000,
+  });
   
   // Form state
   const [formData, setFormData] = useState({
     roomId: '',
     stayType: 'OVERNIGHT' as 'OVERNIGHT' | 'SHORT_STAY',
     paymentMethod: 'CASH' as 'CASH' | 'POS' | 'TRANSFER',
+    guestName: '',
+    guestPhone: '',
+    guestEmail: '',
+    guestAddress: '',
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     fetchBookings();
     fetchRooms();
+    fetchSettings();
   }, []);
+
+  useEffect(() => {
+    if (searchParams.get('quick') === '1') {
+      setShowCreateModal(true);
+    }
+  }, [searchParams]);
+
+  const fetchSettings = async () => {
+    try {
+      const response = await api.get('/api/settings');
+      if (response.data?.pricing) {
+        setPricingSettings(response.data.pricing);
+      }
+    } catch (error) {
+      console.error('Failed to fetch settings:', error);
+    }
+  };
 
   const fetchBookings = async () => {
     try {
@@ -74,6 +104,10 @@ export default function BookingsPage() {
         roomId: '',
         stayType: 'OVERNIGHT',
         paymentMethod: 'CASH',
+        guestName: '',
+        guestPhone: '',
+        guestEmail: '',
+        guestAddress: '',
       });
       setShowCreateModal(false);
     } catch (error: any) {
@@ -107,10 +141,9 @@ export default function BookingsPage() {
     if (!selectedRoom) return 0;
 
     if (selectedRoom.type === 'FAN') {
-      return formData.stayType === 'OVERNIGHT' ? 10000 : 4000;
-    } else {
-      return formData.stayType === 'OVERNIGHT' ? 20000 : 10000;
+      return formData.stayType === 'OVERNIGHT' ? pricingSettings.fanOvernightPrice : pricingSettings.fanShortStayPrice;
     }
+    return formData.stayType === 'OVERNIGHT' ? pricingSettings.acOvernightPrice : pricingSettings.acShortStayPrice;
   };
 
   const formatDate = (dateString: string) => {
@@ -334,6 +367,48 @@ export default function BookingsPage() {
                   <option value="OVERNIGHT">Overnight</option>
                   <option value="SHORT_STAY">Short Stay (90 mins)</option>
                 </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Guest Name (Optional)</label>
+                  <input
+                    type="text"
+                    value={formData.guestName}
+                    onChange={(e) => setFormData({ ...formData, guestName: e.target.value })}
+                    className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-2.5 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Guest Phone (Optional)</label>
+                  <input
+                    type="text"
+                    value={formData.guestPhone}
+                    onChange={(e) => setFormData({ ...formData, guestPhone: e.target.value })}
+                    className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-2.5 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Guest Email (Optional)</label>
+                  <input
+                    type="email"
+                    value={formData.guestEmail}
+                    onChange={(e) => setFormData({ ...formData, guestEmail: e.target.value })}
+                    className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-2.5 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Guest Address (Optional)</label>
+                  <input
+                    type="text"
+                    value={formData.guestAddress}
+                    onChange={(e) => setFormData({ ...formData, guestAddress: e.target.value })}
+                    className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-2.5 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
+                  />
+                </div>
               </div>
 
               {/* Payment Method */}

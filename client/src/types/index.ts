@@ -1,6 +1,7 @@
 export interface User {
   id: string;
   name: string;
+  username?: string;
   role: string;
 }
 
@@ -24,6 +25,7 @@ export interface InventoryItem {
   category: 'DRINK' | 'CONDOM';
   quantity: number;
   price: number;
+  imageUrl?: string | null;
   createdAt: string;
 }
 

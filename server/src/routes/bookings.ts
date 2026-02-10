@@ -4,6 +4,7 @@ import { requireAuth } from "../middleware/auth.js";
 import { requireRole } from "../middleware/roles.js";
 import { UserRole, StayType, BookingSource, PaymentStatus, PaymentMethod, RoomStatus } from "@prisma/client";
 import type { AuthRequest } from "../middleware/auth.js";
+import { readAppSettings } from "./settings.js";
 
 const router = Router();
 
@@ -16,7 +17,7 @@ router.post(
   requireRole(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.FRONT_DESK),
   async (req: AuthRequest, res) => {
     try {
-      const { roomId, stayType, paymentMethod } = req.body;
+      const { roomId, stayType, paymentMethod, guestName, guestPhone, guestEmail, guestAddress } = req.body;
 
       // Validation
       if (!roomId || !stayType || !paymentMethod) {
@@ -41,13 +42,23 @@ router.post(
       }
 
       // Calculate price based on room type and stay type
+      const settings = readAppSettings();
+      const pricing = settings.pricing;
       let price: number;
       if (room.type === "FAN") {
-        price = stayType === StayType.OVERNIGHT ? 10000 : 4000;
+        price = stayType === StayType.OVERNIGHT ? pricing.fanOvernightPrice : pricing.fanShortStayPrice;
       } else {
         // AC room
-        price = stayType === StayType.OVERNIGHT ? 20000 : 10000;
+        price = stayType === StayType.OVERNIGHT ? pricing.acOvernightPrice : pricing.acShortStayPrice;
       }
+
+      const guestPayload = {
+        guestName: typeof guestName === "string" ? guestName.trim() : "",
+        guestPhone: typeof guestPhone === "string" ? guestPhone.trim() : "",
+        guestEmail: typeof guestEmail === "string" ? guestEmail.trim() : "",
+        guestAddress: typeof guestAddress === "string" ? guestAddress.trim() : "",
+      };
+      const hasGuestData = Object.values(guestPayload).some(Boolean);
 
       // Calculate times
       const checkIn = new Date();
@@ -95,6 +106,7 @@ router.post(
             price,
             createdById: req.user!.id,
             businessDayId: businessDay.id,
+            note: hasGuestData ? JSON.stringify(guestPayload) : null,
           },
           include: {
             room: true,
