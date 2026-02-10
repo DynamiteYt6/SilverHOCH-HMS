@@ -1,10 +1,12 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Layout from '../components/Layout';
 import { useAuth } from '../context/AuthContext';
+import api from '../services/api';
 
 export default function SettingsPage() {
-  const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState<'profile' | 'hotel' | 'users' | 'system'>('profile');
+  const { user, updateUser } = useAuth();
+  const [activeTab, setActiveTab] = useState<'profile' | 'hotel' | 'system'>('profile');
+  const [profileStatus, setProfileStatus] = useState<string | null>(null);
 
   // Profile settings state
   const [profileData, setProfileData] = useState({
@@ -12,6 +14,9 @@ export default function SettingsPage() {
     username: '',
     email: '',
     phone: '',
+    address: '',
+    city: '',
+    state: '',
     currentPassword: '',
     newPassword: '',
     confirmPassword: '',
@@ -39,10 +44,54 @@ export default function SettingsPage() {
     acShortStayPrice: '10000',
   });
 
-  const handleProfileUpdate = (e: React.FormEvent) => {
+  useEffect(() => {
+    if (!user) return;
+    const stored = localStorage.getItem('profileExtras');
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored) as Partial<typeof profileData>;
+        setProfileData((prev) => ({
+          ...prev,
+          ...parsed,
+          name: user.name || prev.name,
+        }));
+      } catch {
+        // ignore malformed local data
+      }
+    } else {
+      setProfileData((prev) => ({ ...prev, name: user.name || prev.name }));
+    }
+  }, [user]);
+
+  const handleProfileUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
-    // TODO: Implement API call to update profile
-    alert('Profile update functionality coming soon!');
+    if (!user) return;
+    setProfileStatus(null);
+
+    try {
+      if (profileData.name && profileData.name !== user.name) {
+        const response = await api.patch(`/api/users/${user.id}`, {
+          name: profileData.name
+        });
+        updateUser({ ...user, name: response.data.name });
+      }
+
+      localStorage.setItem(
+        'profileExtras',
+        JSON.stringify({
+          username: profileData.username,
+          email: profileData.email,
+          phone: profileData.phone,
+          address: profileData.address,
+          city: profileData.city,
+          state: profileData.state,
+        })
+      );
+      setProfileStatus('Profile updated successfully.');
+    } catch (err: any) {
+      console.error('Profile update failed:', err);
+      setProfileStatus(err.response?.data?.message || 'Failed to update profile.');
+    }
   };
 
   const handleHotelUpdate = (e: React.FormEvent) => {
@@ -94,21 +143,6 @@ export default function SettingsPage() {
             </svg>
             Hotel
           </button>
-          {(user?.role === 'SUPER_ADMIN' || user?.role === 'ADMIN') && (
-            <button
-              onClick={() => setActiveTab('users')}
-              className={`py-4 border-b-2 transition-colors ${
-                activeTab === 'users'
-                  ? 'border-blue-600 text-blue-600'
-                  : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-white'
-              } text-sm font-bold flex items-center gap-2`}
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-              </svg>
-              Users
-            </button>
-          )}
           <button
             onClick={() => setActiveTab('system')}
             className={`py-4 border-b-2 transition-colors ${
@@ -131,6 +165,11 @@ export default function SettingsPage() {
         <div className="max-w-3xl">
           <div className="bg-white dark:bg-[#1a2130] rounded-xl border border-gray-200 dark:border-gray-800 p-6">
             <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-6">Profile Information</h2>
+            {profileStatus && (
+              <div className="mb-4 p-3 rounded-lg bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-300 border border-blue-100 dark:border-blue-500/30">
+                {profileStatus}
+              </div>
+            )}
             <form onSubmit={handleProfileUpdate} className="space-y-6">
               {/* Avatar Section */}
               <div className="flex items-center gap-6">
@@ -183,6 +222,39 @@ export default function SettingsPage() {
                     type="tel"
                     value={profileData.phone}
                     onChange={(e) => setProfileData({ ...profileData, phone: e.target.value })}
+                    className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-2.5 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Address</label>
+                  <input
+                    type="text"
+                    value={profileData.address}
+                    onChange={(e) => setProfileData({ ...profileData, address: e.target.value })}
+                    className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-2.5 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">City</label>
+                  <input
+                    type="text"
+                    value={profileData.city}
+                    onChange={(e) => setProfileData({ ...profileData, city: e.target.value })}
+                    className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-2.5 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">State</label>
+                  <input
+                    type="text"
+                    value={profileData.state}
+                    onChange={(e) => setProfileData({ ...profileData, state: e.target.value })}
                     className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-2.5 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
                   />
                 </div>
@@ -391,24 +463,6 @@ export default function SettingsPage() {
                 />
               </div>
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* Users Tab */}
-      {activeTab === 'users' && (user?.role === 'SUPER_ADMIN' || user?.role === 'ADMIN') && (
-        <div className="max-w-4xl">
-          <div className="bg-white dark:bg-[#1a2130] rounded-xl border border-gray-200 dark:border-gray-800 p-6">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-xl font-bold text-gray-900 dark:text-white">User Management</h2>
-              <button className="px-4 py-2 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 transition-colors flex items-center gap-2">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                </svg>
-                Add User
-              </button>
-            </div>
-            <p className="text-gray-600 dark:text-gray-400 text-center py-12">User management coming soon...</p>
           </div>
         </div>
       )}

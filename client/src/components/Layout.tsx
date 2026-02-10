@@ -136,6 +136,21 @@ export default function Layout({ children }: LayoutProps) {
           </Link>
 
           <Link
+            to="/users"
+            className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${
+              isActive('/users')
+                ? 'bg-blue-600/10 text-blue-600'
+                : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
+            } ${isCollapsed ? 'justify-center' : ''}`}
+            title={isCollapsed ? 'Users' : undefined}
+          >
+            <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+            </svg>
+            {!isCollapsed && <span className="text-sm font-medium">Users</span>}
+          </Link>
+
+          <Link
             to="/settings"
             className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${
               isActive('/settings')
