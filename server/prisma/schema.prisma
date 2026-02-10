@@ -151,6 +151,7 @@
     category InventoryCategory
     quantity Int
     price    Int
+    imageUrl String?
 
     sales Sale[]
 

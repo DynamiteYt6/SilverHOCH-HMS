@@ -20,6 +20,7 @@ export default function InventoryPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isProcessingSale, setIsProcessingSale] = useState(false);
   const [saleSuccess, setSaleSuccess] = useState(false);
+  const [uploadingItemId, setUploadingItemId] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -161,6 +162,13 @@ export default function InventoryPage() {
 
   // Get item image
   const getItemImage = (item: InventoryItem) => {
+    if (item.imageUrl) {
+      if (item.imageUrl.startsWith('http')) {
+        return item.imageUrl;
+      }
+      const baseUrl = api.defaults.baseURL ?? window.location.origin;
+      return `${baseUrl}${item.imageUrl}`;
+    }
     // Placeholder images based on category
     const imageMap: Record<string, string> = {
       DRINK: 'https://images.unsplash.com/photo-1437418747212-8d9709afab22?w=200&h=200&fit=crop',
@@ -168,6 +176,45 @@ export default function InventoryPage() {
       SNACK: 'https://images.unsplash.com/photo-1599490659213-e2b9527bd087?w=200&h=200&fit=crop',
     };
     return imageMap[item.category] || 'https://images.unsplash.com/photo-1580913428023-ec4dc7e4f7f4?w=200&h=200&fit=crop';
+  };
+
+  const handleImageUpload = async (itemId: string, file?: File) => {
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      setError('Image must be 5MB or smaller.');
+      return;
+    }
+
+    try {
+      setUploadingItemId(itemId);
+      setError(null);
+
+      const imageData = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = () => reject(reader.error);
+        reader.readAsDataURL(file);
+      });
+
+      const response = await api.post<InventoryItem>(`/api/inventory/${itemId}/image`, {
+        imageData,
+        fileName: file.name
+      });
+
+      const updatedItem = response.data;
+      setInventory(prev =>
+        prev.map(item => (item.id === updatedItem.id ? updatedItem : item))
+      );
+      setCart(prev =>
+        prev.map(ci => (ci.item.id === updatedItem.id ? { ...ci, item: updatedItem } : ci))
+      );
+    } catch (err: any) {
+      console.error('Image upload failed:', err);
+      setError(err.response?.data?.message || 'Failed to upload image');
+    } finally {
+      setUploadingItemId(null);
+    }
   };
 
   if (isLoading) {
@@ -274,6 +321,26 @@ export default function InventoryPage() {
                   <span className="text-blue-600 text-xs font-bold text-center">{formatCurrency(item.price)}</span>
                   <div className="mt-1 flex justify-center">
                     {getStockBadge(item.quantity)}
+                  </div>
+                  <div
+                    className="mt-2 flex justify-center"
+                    onClick={(event) => event.stopPropagation()}
+                  >
+                    <label className="cursor-pointer text-[10px] font-semibold text-blue-600 hover:text-blue-700">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(event) => {
+                          event.stopPropagation();
+                          const file = event.target.files?.[0];
+                          handleImageUpload(item.id, file);
+                          event.currentTarget.value = '';
+                        }}
+                        disabled={uploadingItemId === item.id}
+                      />
+                      {uploadingItemId === item.id ? 'Uploading...' : 'Upload image'}
+                    </label>
                   </div>
                 </button>
               ))}
