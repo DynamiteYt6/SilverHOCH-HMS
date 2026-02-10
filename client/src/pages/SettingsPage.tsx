@@ -108,15 +108,16 @@ export default function SettingsPage() {
 
   return (
     <Layout>
-      {/* Page Header */}
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Settings</h1>
-        <p className="text-gray-600 dark:text-gray-400 mt-1">Manage your account and hotel preferences</p>
-      </div>
+      <div className="max-w-4xl mx-auto w-full">
+        {/* Page Header */}
+        <div className="mb-6 text-center">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Settings</h1>
+          <p className="text-gray-600 dark:text-gray-400 mt-1">Manage your account and hotel preferences</p>
+        </div>
 
-      {/* Tabs */}
-      <div className="border-b border-gray-200 dark:border-gray-800 mb-6">
-        <div className="flex gap-8">
+        {/* Tabs */}
+        <div className="border-b border-gray-200 dark:border-gray-800 mb-6">
+          <div className="flex flex-wrap justify-center gap-6">
           <button
             onClick={() => setActiveTab('profile')}
             className={`py-4 border-b-2 transition-colors ${
@@ -157,12 +158,12 @@ export default function SettingsPage() {
             </svg>
             System
           </button>
+          </div>
         </div>
-      </div>
 
-      {/* Profile Tab */}
-      {activeTab === 'profile' && (
-        <div className="max-w-3xl">
+        {/* Profile Tab */}
+        {activeTab === 'profile' && (
+          <div className="max-w-3xl mx-auto">
           <div className="bg-white dark:bg-[#1a2130] rounded-xl border border-gray-200 dark:border-gray-800 p-6">
             <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-6">Profile Information</h2>
             {profileStatus && (
@@ -306,12 +307,12 @@ export default function SettingsPage() {
               </div>
             </form>
           </div>
-        </div>
-      )}
+          </div>
+        )}
 
-      {/* Hotel Tab */}
-      {activeTab === 'hotel' && (
-        <div className="max-w-3xl space-y-6">
+        {/* Hotel Tab */}
+        {activeTab === 'hotel' && (
+          <div className="max-w-3xl mx-auto space-y-6">
           {/* Hotel Information */}
           <div className="bg-white dark:bg-[#1a2130] rounded-xl border border-gray-200 dark:border-gray-800 p-6">
             <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-6">Hotel Information</h2>
@@ -520,8 +521,9 @@ export default function SettingsPage() {
               </div>
             </div>
           </div>
-        </div>
-      )}
+          </div>
+        )}
+      </div>
     </Layout>
   );
 }
