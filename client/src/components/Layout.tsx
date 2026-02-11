@@ -47,6 +47,7 @@ export default function Layout({ children }: LayoutProps) {
 
   const unreadCount = notifications.filter((item) => item.isNew).length;
   const userInitial = user?.name?.charAt(0).toUpperCase() ?? 'U';
+  const userAvatarUrl = user?.avatarUrl || null;
 
   const handleLogout = () => {
     logout();
@@ -224,8 +225,12 @@ export default function Layout({ children }: LayoutProps) {
         {/* User Profile */}
         <div className="p-3 border-t border-gray-200 dark:border-gray-800 mt-auto">
           <div className={`flex items-center gap-2 p-2 ${isCollapsed ? 'flex-col justify-center' : ''}`}>
-            <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold shrink-0 text-sm">
-              {userInitial}
+            <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold shrink-0 text-sm overflow-hidden">
+              {userAvatarUrl ? (
+                <img src={userAvatarUrl} alt={user?.name ?? 'User avatar'} className="w-full h-full object-cover" />
+              ) : (
+                userInitial
+              )}
             </div>
             {!isCollapsed && (
               <div className="overflow-hidden flex-1 min-w-0">
@@ -334,8 +339,12 @@ export default function Layout({ children }: LayoutProps) {
                 className="h-9 pl-1 pr-2 rounded-lg bg-gray-100 dark:bg-gray-800 flex items-center gap-2 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
                 aria-label="Open profile menu"
               >
-                <span className="w-7 h-7 rounded-full bg-blue-600 text-white font-bold text-xs flex items-center justify-center">
-                  {userInitial}
+                <span className="w-7 h-7 rounded-full bg-blue-600 text-white font-bold text-xs flex items-center justify-center overflow-hidden">
+                  {userAvatarUrl ? (
+                    <img src={userAvatarUrl} alt={user?.name ?? 'User avatar'} className="w-full h-full object-cover" />
+                  ) : (
+                    userInitial
+                  )}
                 </span>
                 <svg className={`w-4 h-4 text-gray-500 dark:text-gray-300 transition-transform ${isProfileMenuOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
