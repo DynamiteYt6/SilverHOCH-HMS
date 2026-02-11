@@ -1,0 +1,20 @@
+{
+  "hotel": {
+    "hotelName": "Silver HOCH Hotel",
+    "address": "",
+    "city": "",
+    "state": "",
+    "phone": "",
+    "email": "",
+    "checkInTime": "14:00",
+    "checkOutTime": "12:00",
+    "currency": "NGN",
+    "taxRate": "7.5"
+  },
+  "pricing": {
+    "fanOvernightPrice": 10000,
+    "fanShortStayPrice": 4000,
+    "acOvernightPrice": 20000,
+    "acShortStayPrice": 10000
+  }
+}
