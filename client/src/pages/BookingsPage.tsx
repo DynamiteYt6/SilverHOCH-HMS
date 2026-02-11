@@ -35,7 +35,7 @@ export default function BookingsPage() {
   
   // Form state
   const [formData, setFormData] = useState({
-    roomId: '',
+    roomIds: [] as string[],
     stayType: 'OVERNIGHT' as 'OVERNIGHT' | 'SHORT_STAY',
     paymentMethod: 'CASH' as 'CASH' | 'POS' | 'TRANSFER',
     guestName: '',
@@ -94,7 +94,7 @@ export default function BookingsPage() {
     setIsSubmitting(true);
 
     try {
-      await api.post('/api/bookings', formData);
+      await api.post('/api/bookings', { ...formData, roomIds: formData.roomIds });
       
       // Refresh data
       await fetchBookings();
@@ -102,7 +102,7 @@ export default function BookingsPage() {
       
       // Reset form and close modal
       setFormData({
-        roomId: '',
+        roomIds: [] as string[],
         stayType: 'OVERNIGHT',
         paymentMethod: 'CASH',
         guestName: '',
@@ -138,14 +138,16 @@ export default function BookingsPage() {
     return rooms.filter(room => room.status === 'AVAILABLE');
   };
 
-  const getPrice = () => {
-    const selectedRoom = rooms.find(r => r.id === formData.roomId);
-    if (!selectedRoom) return 0;
-
-    if (selectedRoom.type === 'FAN') {
+  const getRoomPrice = (roomType: 'FAN' | 'AC') => {
+    if (roomType === 'FAN') {
       return formData.stayType === 'OVERNIGHT' ? pricingSettings.fanOvernightPrice * formData.numberOfNights : pricingSettings.fanShortStayPrice;
     }
     return formData.stayType === 'OVERNIGHT' ? pricingSettings.acOvernightPrice * formData.numberOfNights : pricingSettings.acShortStayPrice;
+  };
+
+  const getPrice = () => {
+    const selectedRooms = rooms.filter(r => formData.roomIds.includes(r.id));
+    return selectedRooms.reduce((sum, room) => sum + getRoomPrice(room.type), 0);
   };
 
   const formatDate = (dateString: string) => {
@@ -336,24 +338,30 @@ export default function BookingsPage() {
               {/* Room Selection */}
               <div>
                 <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                  Select Room
+                  Select Room(s)
                 </label>
-                <select
-                  value={formData.roomId}
-                  onChange={(e) => setFormData({ ...formData, roomId: e.target.value })}
-                  className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-2.5 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
-                  required
-                >
-                  <option value="">Choose a room...</option>
+                <div className="max-h-40 overflow-y-auto rounded-lg border border-gray-300 dark:border-gray-700 p-3 bg-white dark:bg-gray-800 space-y-2">
                   {getAvailableRooms().map((room) => (
-                    <option key={room.id} value={room.id}>
-                      Room {room.number} - {room.type} (Floor {room.floor})
-                    </option>
+                    <label key={room.id} className="flex items-center gap-3 text-sm text-gray-900 dark:text-white">
+                      <input
+                        type="checkbox"
+                        checked={formData.roomIds.includes(room.id)}
+                        onChange={(e) => {
+                          const next = e.target.checked
+                            ? [...formData.roomIds, room.id]
+                            : formData.roomIds.filter((id) => id !== room.id);
+                          setFormData({ ...formData, roomIds: next });
+                        }}
+                        className="rounded border-gray-300 dark:border-gray-700 text-blue-600 focus:ring-blue-600"
+                      />
+                      <span>Room {room.number} - {room.type} (Floor {room.floor})</span>
+                    </label>
                   ))}
-                </select>
-                {getAvailableRooms().length === 0 && (
-                  <p className="mt-2 text-sm text-red-600 dark:text-red-500">No available rooms</p>
-                )}
+                  {getAvailableRooms().length === 0 && (
+                    <p className="text-sm text-red-600 dark:text-red-500">No available rooms</p>
+                  )}
+                </div>
+                <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">You can book multiple rooms in one action.</p>
               </div>
 
               {/* Stay Type */}
@@ -451,7 +459,7 @@ export default function BookingsPage() {
               </div>
 
               {/* Price Display */}
-              {formData.roomId && (
+              {formData.roomIds.length > 0 && (
                 <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
                   <div className="flex justify-between items-center">
                     <span className="text-sm text-gray-600 dark:text-gray-400">Total Amount</span>
@@ -463,7 +471,7 @@ export default function BookingsPage() {
               {/* Submit Button */}
               <button
                 type="submit"
-                disabled={isSubmitting || !formData.roomId}
+                disabled={isSubmitting || formData.roomIds.length === 0}
                 className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {isSubmitting ? (

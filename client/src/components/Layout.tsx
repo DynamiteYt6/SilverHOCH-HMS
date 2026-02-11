@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
@@ -8,12 +8,23 @@ interface LayoutProps {
   children: React.ReactNode;
 }
 
+
+interface NotificationItem {
+  id: string;
+  type: string;
+  title: string;
+  message: string;
+  createdAt: string;
+}
+
 export default function Layout({ children }: LayoutProps) {
   const { user, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [showNotifications, setShowNotifications] = useState(false);
 
   const handleLogout = () => {
     logout();
@@ -24,6 +35,20 @@ export default function Layout({ children }: LayoutProps) {
   const avatarUrl = user?.avatarUrl
     ? (user.avatarUrl.startsWith('http') ? user.avatarUrl : `${api.defaults.baseURL ?? window.location.origin}${user.avatarUrl}`)
     : null;
+
+  useEffect(() => {
+    const fetchNotifications = async () => {
+      try {
+        const response = await api.get('/api/notifications');
+        setNotifications(response.data.notifications || []);
+      } catch (error) {
+        console.error('Failed to fetch notifications:', error);
+      }
+    };
+
+    fetchNotifications();
+  }, []);
+
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-[#0d1117]">
@@ -228,12 +253,34 @@ export default function Layout({ children }: LayoutProps) {
               )}
             </button>
 
-            <button className="w-9 h-9 flex items-center justify-center rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-white relative">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-              </svg>
-              <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border border-white dark:border-gray-800"></span>
-            </button>
+            <div className="relative">
+              <button
+                onClick={() => setShowNotifications((prev) => !prev)}
+                className="w-9 h-9 flex items-center justify-center rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-white relative"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                </svg>
+                {notifications.length > 0 && (
+                  <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border border-white dark:border-gray-800"></span>
+                )}
+              </button>
+              {showNotifications && (
+                <div className="absolute right-0 mt-2 w-80 bg-white dark:bg-[#1a2130] border border-gray-200 dark:border-gray-800 rounded-lg shadow-xl z-50 max-h-96 overflow-y-auto">
+                  <div className="p-3 border-b border-gray-200 dark:border-gray-800 font-semibold text-gray-900 dark:text-white">Notifications</div>
+                  {notifications.length === 0 ? (
+                    <p className="p-3 text-sm text-gray-500 dark:text-gray-400">No notifications yet.</p>
+                  ) : (
+                    notifications.map((item) => (
+                      <div key={item.id} className="p-3 border-b border-gray-100 dark:border-gray-800/70">
+                        <p className="text-sm font-semibold text-gray-900 dark:text-white">{item.title}</p>
+                        <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">{item.message}</p>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
 
             <div className="h-6 w-[1px] bg-gray-200 dark:bg-gray-800 mx-1"></div>
 

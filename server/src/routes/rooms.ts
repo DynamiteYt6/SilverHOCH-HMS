@@ -31,6 +31,46 @@ router.get(
   }
 );
 
+
+// ============================================
+// POST /api/rooms - Create room (Super Admin)
+// ============================================
+router.post(
+  "/",
+  requireAuth,
+  requireRole(UserRole.SUPER_ADMIN),
+  async (req, res) => {
+    try {
+      const { number, type, floor } = req.body;
+
+      if (typeof number !== "number" || typeof floor !== "number" || !type) {
+        return res.status(400).json({ message: "number, type, and floor are required" });
+      }
+
+      if (!["FAN", "AC"].includes(type)) {
+        return res.status(400).json({ message: "Invalid room type" });
+      }
+
+      const room = await prisma.room.create({
+        data: {
+          number,
+          type,
+          floor,
+          status: "AVAILABLE",
+        },
+      });
+
+      res.status(201).json(room);
+    } catch (error: any) {
+      if (error?.code === "P2002") {
+        return res.status(400).json({ message: "Room number already exists" });
+      }
+      console.error(error);
+      res.status(500).json({ message: "Failed to create room" });
+    }
+  }
+);
+
 // ============================================
 // GET /api/rooms/:id - Get single room
 // ============================================

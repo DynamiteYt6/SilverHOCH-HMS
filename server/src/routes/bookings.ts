@@ -17,12 +17,16 @@ router.post(
   requireRole(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.FRONT_DESK),
   async (req: AuthRequest, res) => {
     try {
-      const { roomId, stayType, paymentMethod, guestName, guestPhone, guestEmail, guestAddress, numberOfNights } = req.body;
+      const { roomId, roomIds, stayType, paymentMethod, guestName, guestPhone, guestEmail, guestAddress, numberOfNights } = req.body;
+
+      const requestedRoomIds = Array.isArray(roomIds)
+        ? roomIds.filter((id): id is string => typeof id === "string" && id.trim().length > 0)
+        : (typeof roomId === "string" && roomId.trim().length > 0 ? [roomId] : []);
 
       // Validation
-      if (!roomId || !stayType || !paymentMethod) {
+      if (requestedRoomIds.length === 0 || !stayType || !paymentMethod) {
         return res.status(400).json({ 
-          message: "roomId, stayType, and paymentMethod are required" 
+          message: "roomId/roomIds, stayType, and paymentMethod are required" 
         });
       }
 
@@ -30,31 +34,30 @@ router.post(
         ? Math.min(30, Math.max(1, Number(numberOfNights) || 1))
         : 1;
 
-      // Check if room exists and is available
-      const room = await prisma.room.findUnique({
-        where: { id: roomId }
+      const rooms = await prisma.room.findMany({
+        where: { id: { in: requestedRoomIds } }
       });
 
-      if (!room) {
-        return res.status(404).json({ message: "Room not found" });
+      if (rooms.length !== requestedRoomIds.length) {
+        return res.status(404).json({ message: "One or more selected rooms were not found" });
       }
 
-      if (room.status !== RoomStatus.AVAILABLE) {
-        return res.status(400).json({ 
-          message: `Room is ${room.status}, not available for booking` 
+      const unavailableRoom = rooms.find((room) => room.status !== RoomStatus.AVAILABLE);
+      if (unavailableRoom) {
+        return res.status(400).json({
+          message: `Room ${unavailableRoom.number} is ${unavailableRoom.status}, not available for booking`,
         });
       }
 
       // Calculate price based on room type and stay type
       const settings = readAppSettings();
       const pricing = settings.pricing;
-      let price: number;
-      if (room.type === "FAN") {
-        price = stayType === StayType.OVERNIGHT ? pricing.fanOvernightPrice * nights : pricing.fanShortStayPrice;
-      } else {
-        // AC room
-        price = stayType === StayType.OVERNIGHT ? pricing.acOvernightPrice * nights : pricing.acShortStayPrice;
-      }
+      const priceForRoom = (roomType: "FAN" | "AC") => {
+        if (roomType === "FAN") {
+          return stayType === StayType.OVERNIGHT ? pricing.fanOvernightPrice * nights : pricing.fanShortStayPrice;
+        }
+        return stayType === StayType.OVERNIGHT ? pricing.acOvernightPrice * nights : pricing.acShortStayPrice;
+      };
 
       const bookingMetadata = {
         guestName: typeof guestName === "string" ? guestName.trim() : "",
@@ -97,60 +100,65 @@ router.post(
         });
       }
 
-      // Create booking with payment in a transaction
-      const booking = await prisma.$transaction(async (tx) => {
-        // Create the booking
-        const newBooking = await tx.booking.create({
-          data: {
-            roomId,
-            stayType,
-            source: BookingSource.WALK_IN,
-            checkIn,
-            checkOut,
-            shortStayEnd,
-            price,
-            createdById: req.user!.id,
-            businessDayId: businessDay.id,
-            note: hasMetadata ? JSON.stringify(bookingMetadata) : null,
-          },
-          include: {
-            room: true,
-            payment: true,
-          }
-        });
+      // Create bookings with payments in a transaction
+      const bookingIds = await prisma.$transaction(async (tx) => {
+        const createdBookingIds: string[] = [];
 
-        // Create payment record
-        await tx.payment.create({
-          data: {
-            bookingId: newBooking.id,
-            amount: price,
-            method: paymentMethod,
-            status: PaymentStatus.PENDING,
-          }
-        });
+        for (const room of rooms) {
+          const roomPrice = priceForRoom(room.type);
 
-        // Update room status to OCCUPIED
-        await tx.room.update({
-          where: { id: roomId },
-          data: { status: RoomStatus.OCCUPIED }
-        });
+          const newBooking = await tx.booking.create({
+            data: {
+              roomId: room.id,
+              stayType,
+              source: BookingSource.WALK_IN,
+              checkIn,
+              checkOut,
+              shortStayEnd,
+              price: roomPrice,
+              createdById: req.user!.id,
+              businessDayId: businessDay.id,
+              note: hasMetadata ? JSON.stringify(bookingMetadata) : null,
+            },
+          });
 
-        return newBooking;
+          await tx.payment.create({
+            data: {
+              bookingId: newBooking.id,
+              amount: roomPrice,
+              method: paymentMethod,
+              status: PaymentStatus.PENDING,
+            }
+          });
+
+          await tx.room.update({
+            where: { id: room.id },
+            data: { status: RoomStatus.OCCUPIED }
+          });
+
+          createdBookingIds.push(newBooking.id);
+        }
+
+        return createdBookingIds;
       });
 
-      // Fetch the complete booking with payment
-      const completeBooking = await prisma.booking.findUnique({
-        where: { id: booking.id },
+      // Fetch complete bookings with payment details
+      const completeBookings = await prisma.booking.findMany({
+        where: { id: { in: bookingIds } },
         include: {
           room: true,
           payment: true,
           createdBy: {
             select: { id: true, name: true, role: true }
           }
-        }
+        },
+        orderBy: { createdAt: "desc" }
       });
 
-      res.status(201).json(completeBooking);
+      res.status(201).json({
+        message: `Created ${completeBookings.length} booking${completeBookings.length > 1 ? "s" : ""} successfully`,
+        bookings: completeBookings,
+      });
 
     } catch (error) {
       console.error(error);

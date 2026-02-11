@@ -586,26 +586,33 @@ export default function SettingsPage() {
           {/* Check-in/Check-out Times */}
           <div className="bg-white dark:bg-[#1a2130] rounded-xl border border-gray-200 dark:border-gray-800 p-6">
             <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-6">Check-in & Check-out</h2>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Check-in Time</label>
-                <input
-                  type="time"
-                  value={hotelData.checkInTime}
-                  onChange={(e) => setHotelData({ ...hotelData, checkInTime: e.target.value })}
-                  className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-2.5 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
-                />
+            <form onSubmit={handleHotelUpdate} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Check-in Time</label>
+                  <input
+                    type="time"
+                    value={hotelData.checkInTime}
+                    onChange={(e) => setHotelData({ ...hotelData, checkInTime: e.target.value })}
+                    className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-2.5 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Check-out Time</label>
+                  <input
+                    type="time"
+                    value={hotelData.checkOutTime}
+                    onChange={(e) => setHotelData({ ...hotelData, checkOutTime: e.target.value })}
+                    className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-2.5 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
+                  />
+                </div>
               </div>
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Check-out Time</label>
-                <input
-                  type="time"
-                  value={hotelData.checkOutTime}
-                  onChange={(e) => setHotelData({ ...hotelData, checkOutTime: e.target.value })}
-                  className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-2.5 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
-                />
+              <div className="flex justify-end">
+                <button type="submit" className="px-6 py-2.5 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 transition-colors">
+                  Save Check-in/out Times
+                </button>
               </div>
-            </div>
+            </form>
           </div>
           </div>
         )}
