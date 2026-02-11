@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
+import api from '../services/api';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -20,6 +21,9 @@ export default function Layout({ children }: LayoutProps) {
   };
 
   const isActive = (path: string) => location.pathname === path;
+  const avatarUrl = user?.avatarUrl
+    ? (user.avatarUrl.startsWith('http') ? user.avatarUrl : `${api.defaults.baseURL ?? window.location.origin}${user.avatarUrl}`)
+    : null;
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-[#0d1117]">
@@ -170,8 +174,8 @@ export default function Layout({ children }: LayoutProps) {
         {/* User Profile */}
         <div className="p-3 border-t border-gray-200 dark:border-gray-800 mt-auto">
           <div className={`flex items-center gap-2 p-2 ${isCollapsed ? 'flex-col justify-center' : ''}`}>
-            <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold shrink-0 text-sm">
-              {user?.name.charAt(0)}
+            <div className="w-8 h-8 rounded-full bg-blue-600 overflow-hidden flex items-center justify-center text-white font-bold shrink-0 text-sm">
+              {avatarUrl ? <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" /> : user?.name.charAt(0)}
             </div>
             {!isCollapsed && (
               <div className="overflow-hidden flex-1 min-w-0">
