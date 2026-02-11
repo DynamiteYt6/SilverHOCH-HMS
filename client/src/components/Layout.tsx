@@ -233,7 +233,9 @@ export default function Layout({ children }: LayoutProps) {
 
             <div className="h-6 w-[1px] bg-gray-200 dark:bg-gray-800 mx-1"></div>
 
-            <button className="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-semibold flex items-center gap-2 hover:bg-blue-700 transition-colors">
+            <button
+              onClick={() => navigate('/bookings?quick=1')}
+              className="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-semibold flex items-center gap-2 hover:bg-blue-700 transition-colors">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
               </svg>

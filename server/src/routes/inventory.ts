@@ -96,8 +96,14 @@ router.post(
         .toLowerCase();
 
       const safeName = `${Date.now()}-${Math.round(Math.random() * 1e9)}${safeExtension}`;
+      const imageBuffer = Buffer.from(base64Data, "base64");
+
+      if (imageBuffer.length > 5 * 1024 * 1024) {
+        return res.status(400).json({ message: "Image must be 5MB or smaller" });
+      }
+
       fs.mkdirSync(uploadDir, { recursive: true });
-      fs.writeFileSync(path.join(uploadDir, safeName), Buffer.from(base64Data, "base64"));
+      fs.writeFileSync(path.join(uploadDir, safeName), imageBuffer);
 
       const imageUrl = `/uploads/inventory/${safeName}`;
 

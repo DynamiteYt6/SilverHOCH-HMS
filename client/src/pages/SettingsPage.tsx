@@ -7,6 +7,7 @@ export default function SettingsPage() {
   const { user, updateUser } = useAuth();
   const [activeTab, setActiveTab] = useState<'profile' | 'hotel' | 'system'>('profile');
   const [profileStatus, setProfileStatus] = useState<string | null>(null);
+  const [settingsStatus, setSettingsStatus] = useState<string | null>(null);
 
   // Profile settings state
   const [profileData, setProfileData] = useState({
@@ -54,6 +55,7 @@ export default function SettingsPage() {
           ...prev,
           ...parsed,
           name: user.name || prev.name,
+          username: user.username || parsed.username || prev.username,
         }));
       } catch {
         // ignore malformed local data
@@ -87,6 +89,12 @@ export default function SettingsPage() {
           state: profileData.state,
         })
       );
+      setProfileData((prev) => ({
+        ...prev,
+        currentPassword: '',
+        newPassword: '',
+        confirmPassword: '',
+      }));
       setProfileStatus('Profile updated successfully.');
     } catch (err: any) {
       console.error('Profile update failed:', err);
@@ -94,16 +102,46 @@ export default function SettingsPage() {
     }
   };
 
-  const handleHotelUpdate = (e: React.FormEvent) => {
+  const handleHotelUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
-    // TODO: Implement API call to update hotel settings
-    alert('Hotel settings update functionality coming soon!');
+    try {
+      setSettingsStatus(null);
+      const response = await api.patch('/api/settings', {
+        hotel: hotelData,
+      });
+      setHotelData((prev) => ({ ...prev, ...(response.data.hotel || {}) }));
+      setSettingsStatus('Hotel information saved successfully.');
+    } catch (err: any) {
+      console.error('Failed to save hotel settings:', err);
+      setSettingsStatus(err.response?.data?.message || 'Failed to save hotel settings.');
+    }
   };
 
-  const handlePricingUpdate = (e: React.FormEvent) => {
+  const handlePricingUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
-    // TODO: Implement API call to update pricing
-    alert('Pricing update functionality coming soon!');
+    try {
+      setSettingsStatus(null);
+      const response = await api.patch('/api/settings', {
+        pricing: {
+          fanOvernightPrice: Number(pricing.fanOvernightPrice),
+          fanShortStayPrice: Number(pricing.fanShortStayPrice),
+          acOvernightPrice: Number(pricing.acOvernightPrice),
+          acShortStayPrice: Number(pricing.acShortStayPrice),
+        }
+      });
+      if (response.data.pricing) {
+        setPricing({
+          fanOvernightPrice: String(response.data.pricing.fanOvernightPrice),
+          fanShortStayPrice: String(response.data.pricing.fanShortStayPrice),
+          acOvernightPrice: String(response.data.pricing.acOvernightPrice),
+          acShortStayPrice: String(response.data.pricing.acShortStayPrice),
+        });
+      }
+      setSettingsStatus('Pricing settings saved successfully.');
+    } catch (err: any) {
+      console.error('Failed to save pricing settings:', err);
+      setSettingsStatus(err.response?.data?.message || 'Failed to save pricing settings.');
+    }
   };
 
   return (
@@ -114,6 +152,12 @@ export default function SettingsPage() {
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Settings</h1>
           <p className="text-gray-600 dark:text-gray-400 mt-1">Manage your account and hotel preferences</p>
         </div>
+
+        {settingsStatus && (
+          <div className="mb-4 p-3 rounded-lg bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-300 border border-blue-100 dark:border-blue-500/30 text-center">
+            {settingsStatus}
+          </div>
+        )}
 
         {/* Tabs */}
         <div className="border-b border-gray-200 dark:border-gray-800 mb-6">

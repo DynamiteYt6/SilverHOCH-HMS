@@ -61,12 +61,12 @@ export default function InventoryPage() {
   };
 
   // Remove from cart
-  const removeFromCart = (itemId: number) => {
+  const removeFromCart = (itemId: string) => {
     setCart(cart.filter(ci => ci.item.id !== itemId));
   };
 
   // Update cart quantity
-  const updateQuantity = (itemId: number, quantity: number) => {
+  const updateQuantity = (itemId: string, quantity: number) => {
     if (quantity < 1) {
       removeFromCart(itemId);
     } else {
@@ -180,6 +180,11 @@ export default function InventoryPage() {
 
   const handleImageUpload = async (itemId: string, file?: File) => {
     if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      setError('Image must be 5MB or smaller.');
+      return;
+    }
 
     try {
       setUploadingItemId(itemId);
