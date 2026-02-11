@@ -1,7 +1,7 @@
 import { Router } from "express";
-import prisma from "../lib/prisma";
-import { verifyPassword } from "../lib/hash";
-import { signToken } from "../lib/jwt";
+import prisma from "../lib/prisma.js";
+import { verifyPassword } from "../lib/hash.js";
+import { signToken } from "../lib/jwt.js";
 
 const router = Router();
 
@@ -35,7 +35,9 @@ router.post("/login", async (req, res) => {
     user: {
       id: user.id,
       name: user.name,
+      username: user.username,
       role: user.role,
+      avatarUrl: user.avatarUrl,
     },
   });
 });
