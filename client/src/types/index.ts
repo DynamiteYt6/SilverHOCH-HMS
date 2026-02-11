@@ -1,7 +1,9 @@
 export interface User {
   id: string;
   name: string;
+  username?: string;
   role: string;
+  avatarUrl?: string | null;
 }
 
 export interface LoginResponse {
@@ -24,6 +26,7 @@ export interface InventoryItem {
   category: 'DRINK' | 'CONDOM';
   quantity: number;
   price: number;
+  imageUrl?: string | null;
   createdAt: string;
 }
 
@@ -40,6 +43,7 @@ export interface Sale {
     id: string;
     name: string;
     role: string;
+  avatarUrl?: string | null;
   };
   createdAt: string;
 }
