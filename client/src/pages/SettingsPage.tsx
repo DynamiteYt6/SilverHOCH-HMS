@@ -218,13 +218,28 @@ export default function SettingsPage() {
             <form onSubmit={handleProfileUpdate} className="space-y-6">
               {/* Avatar Section */}
               <div className="flex items-center gap-6">
-                <div className="w-20 h-20 rounded-full bg-blue-600 flex items-center justify-center text-white text-3xl font-bold">
-                  {user?.name.charAt(0)}
+                <div className="w-20 h-20 rounded-full bg-blue-600 overflow-hidden flex items-center justify-center text-white text-3xl font-bold">
+                  {getAvatarUrl() ? (
+                    <img src={getAvatarUrl()!} alt="Profile avatar" className="w-full h-full object-cover" />
+                  ) : (
+                    user?.name.charAt(0)
+                  )}
                 </div>
                 <div>
-                  <button type="button" className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-bold hover:bg-blue-700 transition-colors">
-                    Change Photo
-                  </button>
+                  <label className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-bold hover:bg-blue-700 transition-colors cursor-pointer inline-block">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      disabled={isUploadingAvatar}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        handleAvatarUpload(file);
+                        e.currentTarget.value = '';
+                      }}
+                    />
+                    {isUploadingAvatar ? 'Uploading...' : 'Change Photo'}
+                  </label>
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">JPG, GIF or PNG. Max size of 2MB</p>
                 </div>
               </div>

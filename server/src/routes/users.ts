@@ -1,4 +1,6 @@
 import { Router } from "express";
+import fs from "fs";
+import path from "path";
 import prisma from "../lib/prisma.js";
 import { requireAuth } from "../middleware/auth.js";
 import { requireRole } from "../middleware/roles.js";
@@ -109,6 +111,67 @@ router.patch(
   }
 );
 
+
+// ============================================
+// POST /api/users/me/avatar - Upload avatar
+// ============================================
+router.post(
+  "/me/avatar",
+  requireAuth,
+  async (req: AuthRequest, res) => {
+    try {
+      const { imageData, fileName } = req.body;
+
+      if (!imageData || typeof imageData !== "string") {
+        return res.status(400).json({ message: "Image data is required" });
+      }
+
+      const matches = imageData.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/);
+      if (!matches) {
+        return res.status(400).json({ message: "Invalid image data format" });
+      }
+
+      const mimeType = matches[1] ?? "image/jpeg";
+      const base64Data = matches[2];
+      if (!base64Data) {
+        return res.status(400).json({ message: "Invalid image payload" });
+      }
+      const extFromMime = mimeType.split("/")[1] || "jpg";
+      const providedExt = fileName ? path.extname(fileName) : "";
+      const safeExt = (providedExt || `.${extFromMime}`).replace(/[^a-zA-Z0-9.]/g, "").toLowerCase();
+
+      const buffer = Buffer.from(base64Data, "base64");
+      if (buffer.length > 2 * 1024 * 1024) {
+        return res.status(400).json({ message: "Avatar must be 2MB or smaller" });
+      }
+
+      const avatarDir = path.join(process.cwd(), "uploads", "avatars");
+      fs.mkdirSync(avatarDir, { recursive: true });
+      const safeName = `${Date.now()}-${Math.round(Math.random() * 1e9)}${safeExt}`;
+      fs.writeFileSync(path.join(avatarDir, safeName), buffer);
+
+      const updatedUser = await prisma.user.update({
+        where: { id: req.user!.id },
+        data: { avatarUrl: `/uploads/avatars/${safeName}` },
+        select: {
+          id: true,
+          name: true,
+          username: true,
+          role: true,
+          avatarUrl: true,
+          isActive: true,
+          createdAt: true,
+        }
+      });
+
+      res.json(updatedUser);
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ message: "Failed to upload avatar" });
+    }
+  }
+);
+
 // ============================================
 // GET /api/users - Get all users
 // ============================================
@@ -124,6 +187,7 @@ router.get(
           name: true,
           username: true,
           role: true,
+          avatarUrl: true,
           isActive: true,
           createdAt: true,
           // Don't send password!
@@ -191,6 +255,7 @@ router.post(
           name: true,
           username: true,
           role: true,
+          avatarUrl: true,
           isActive: true,
           createdAt: true,
           // Don't return password
@@ -252,6 +317,7 @@ router.patch(
           name: true,
           username: true,
           role: true,
+          avatarUrl: true,
           isActive: true,
           createdAt: true,
         }

@@ -3,6 +3,7 @@ export interface User {
   name: string;
   username?: string;
   role: string;
+  avatarUrl?: string | null;
 }
 
 export interface LoginResponse {
@@ -42,6 +43,7 @@ export interface Sale {
     id: string;
     name: string;
     role: string;
+  avatarUrl?: string | null;
   };
   createdAt: string;
 }
