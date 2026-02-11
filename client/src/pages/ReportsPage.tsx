@@ -136,17 +136,37 @@ export default function ReportsPage() {
     }));
   }, [report]);
 
+
+  const parseBookingMeta = (note?: string | null) => {
+    if (!note) return null;
+    try {
+      const parsed = JSON.parse(note);
+      return typeof parsed === 'object' && parsed !== null ? parsed as Record<string, unknown> : null;
+    } catch {
+      return null;
+    }
+  };
+
   const ledgerRows = useMemo(() => {
-    const bookingRows = (report?.bookings ?? []).map(booking => ({
-      ref: booking.id.slice(0, 8).toUpperCase(),
-      description: 'Room Booking',
-      guest: booking.note || 'Walk-in Guest',
-      room: booking.room.number.toString(),
-      method: booking.payment?.method ?? 'Folio',
-      amount: booking.payment?.amount ?? booking.price,
-      status: booking.payment?.status === 'PAID' ? 'Paid' : 'Pending',
-      createdAt: booking.createdAt
-    }));
+    const bookingRows = (report?.bookings ?? []).map(booking => {
+      const meta = parseBookingMeta(booking.note);
+      const guestName = typeof meta?.guestName === 'string' && meta.guestName.trim() ? meta.guestName.trim() : 'Walk-in Guest';
+      const nights = typeof meta?.nights === 'number' ? meta.nights : 1;
+      const bookingType = typeof meta?.bookingType === 'string' ? meta.bookingType : 'NORMAL';
+      const noteText = typeof meta?.notes === 'string' ? meta.notes.trim() : '';
+
+      return {
+        ref: booking.id.slice(0, 8).toUpperCase(),
+        description: bookingType === 'COMPLIMENTARY' ? 'Complimentary Room Booking' : 'Room Booking',
+        guest: noteText ? `${guestName} • ${noteText}` : guestName,
+        room: booking.room.number.toString(),
+        method: booking.payment?.method ?? 'Folio',
+        amount: booking.payment?.amount ?? booking.price,
+        status: booking.payment?.status === 'PAID' ? 'Paid' : 'Pending',
+        createdAt: booking.createdAt,
+        nights,
+      };
+    });
 
     const salesRows = (report?.sales ?? []).map(sale => ({
       ref: sale.id.slice(0, 8).toUpperCase(),
@@ -156,7 +176,8 @@ export default function ReportsPage() {
       method: sale.paymentMethod,
       amount: sale.totalPrice,
       status: 'Paid',
-      createdAt: sale.createdAt
+      createdAt: sale.createdAt,
+      nights: null
     }));
 
     return [...bookingRows, ...salesRows].sort((a, b) => {
@@ -181,6 +202,34 @@ export default function ReportsPage() {
     : 0;
   const digitalStroke = 440 - (440 * digitalShare) / 100;
   const cashStroke = 440 - (440 * cashShare) / 100;
+
+  const handleExportCsv = () => {
+    const headers = ['Ref', 'Description', 'Guest/Entity', 'Room', 'Method', 'Amount', 'Status', 'Date'];
+    const rows = ledgerRows.map((row) => [
+      row.ref,
+      row.description,
+      row.guest,
+      row.room,
+      row.method,
+      row.amount.toString(),
+      row.status,
+      new Date(row.createdAt).toISOString(),
+    ]);
+
+    const csv = [headers, ...rows]
+      .map((cols) => cols.map((value) => `"${String(value).replace(/"/g, '""')}"`).join(','))
+      .join('\n');
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `transaction-ledger-${reportDate.toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
 
   return (
     <Layout>
@@ -393,7 +442,7 @@ export default function ReportsPage() {
               ))}
             </div>
           </div>
-          <button className="flex items-center justify-center rounded-lg h-10 bg-blue-600/10 text-blue-600 hover:bg-blue-600/20 transition-colors border border-blue-600/20 px-4 font-bold text-sm">
+          <button onClick={handleExportCsv} className="flex items-center justify-center rounded-lg h-10 bg-blue-600/10 text-blue-600 hover:bg-blue-600/20 transition-colors border border-blue-600/20 px-4 font-bold text-sm">
             <span className="material-symbols-outlined mr-2 text-[20px]">download</span>
             Export to Excel
           </button>
@@ -430,7 +479,7 @@ export default function ReportsPage() {
                   paginatedRows.map((row) => (
                     <tr key={`${row.ref}-${row.createdAt}`} className="text-sm hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
                       <td className="px-6 py-4 font-mono text-xs text-gray-700 dark:text-gray-300">{row.ref}</td>
-                      <td className="px-6 py-4 font-medium text-gray-900 dark:text-white">{row.description}</td>
+                      <td className="px-6 py-4 font-medium text-gray-900 dark:text-white">{row.description}{row.nights && row.nights > 1 ? ` (${row.nights} nights)` : ""}</td>
                       <td className="px-6 py-4 text-gray-700 dark:text-gray-300">{row.guest}</td>
                       <td className="px-6 py-4 text-gray-700 dark:text-gray-300">{row.room}</td>
                       <td className="px-6 py-4">

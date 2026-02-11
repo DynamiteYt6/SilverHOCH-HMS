@@ -17,7 +17,7 @@ router.post(
   requireRole(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.FRONT_DESK),
   async (req: AuthRequest, res) => {
     try {
-      const { roomId, stayType, paymentMethod, guestName, guestPhone, guestEmail, guestAddress } = req.body;
+      const { roomId, stayType, paymentMethod, guestName, guestPhone, guestEmail, guestAddress, nights, bookingType, note } = req.body;
 
       // Validation
       if (!roomId || !stayType || !paymentMethod) {
@@ -41,24 +41,35 @@ router.post(
         });
       }
 
+      const normalizedBookingType = bookingType === "COMPLIMENTARY" ? "COMPLIMENTARY" : "NORMAL";
+      const normalizedNights = Number.isInteger(Number(nights)) && Number(nights) > 0 ? Number(nights) : 1;
+
       // Calculate price based on room type and stay type
       const settings = readAppSettings();
       const pricing = settings.pricing;
-      let price: number;
+      let basePrice: number;
       if (room.type === "FAN") {
-        price = stayType === StayType.OVERNIGHT ? pricing.fanOvernightPrice : pricing.fanShortStayPrice;
+        basePrice = stayType === StayType.OVERNIGHT ? pricing.fanOvernightPrice : pricing.fanShortStayPrice;
       } else {
-        // AC room
-        price = stayType === StayType.OVERNIGHT ? pricing.acOvernightPrice : pricing.acShortStayPrice;
+        basePrice = stayType === StayType.OVERNIGHT ? pricing.acOvernightPrice : pricing.acShortStayPrice;
       }
+
+      const price = normalizedBookingType === "COMPLIMENTARY"
+        ? 0
+        : stayType === StayType.OVERNIGHT
+          ? basePrice * normalizedNights
+          : basePrice;
 
       const guestPayload = {
         guestName: typeof guestName === "string" ? guestName.trim() : "",
         guestPhone: typeof guestPhone === "string" ? guestPhone.trim() : "",
         guestEmail: typeof guestEmail === "string" ? guestEmail.trim() : "",
         guestAddress: typeof guestAddress === "string" ? guestAddress.trim() : "",
+        notes: typeof note === "string" ? note.trim() : "",
+        nights: stayType === StayType.OVERNIGHT ? normalizedNights : 1,
+        bookingType: normalizedBookingType,
       };
-      const hasGuestData = Object.values(guestPayload).some(Boolean);
+      const hasGuestData = Object.values(guestPayload).some((value) => value !== "" && value !== 1 && value !== "NORMAL");
 
       // Calculate times
       const checkIn = new Date();
@@ -69,7 +80,6 @@ router.post(
         // Short stay = 90 minutes from now
         shortStayEnd = new Date(checkIn.getTime() + 90 * 60 * 1000);
       }
-      // For overnight, checkOut is set when they actually check out
 
       // Get or create today's business day
       const today = new Date();
@@ -100,6 +110,7 @@ router.post(
             roomId,
             stayType,
             source: BookingSource.WALK_IN,
+            bookingType: normalizedBookingType,
             checkIn,
             checkOut,
             shortStayEnd,
@@ -120,7 +131,7 @@ router.post(
             bookingId: newBooking.id,
             amount: price,
             method: paymentMethod,
-            status: PaymentStatus.PENDING,
+            status: normalizedBookingType === "COMPLIMENTARY" ? PaymentStatus.PAID : PaymentStatus.PENDING,
           }
         });
 

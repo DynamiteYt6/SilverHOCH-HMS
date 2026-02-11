@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Layout from '../components/Layout';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
@@ -8,6 +8,8 @@ export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<'profile' | 'hotel' | 'system'>('profile');
   const [profileStatus, setProfileStatus] = useState<string | null>(null);
   const [settingsStatus, setSettingsStatus] = useState<string | null>(null);
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(user?.avatarUrl || null);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
 
   // Profile settings state
   const [profileData, setProfileData] = useState({
@@ -21,6 +23,7 @@ export default function SettingsPage() {
     currentPassword: '',
     newPassword: '',
     confirmPassword: '',
+    avatarUrl: user?.avatarUrl || '',
   });
 
   // Hotel settings state
@@ -56,7 +59,9 @@ export default function SettingsPage() {
           ...parsed,
           name: user.name || prev.name,
           username: user.username || parsed.username || prev.username,
+          avatarUrl: user.avatarUrl || parsed.avatarUrl || prev.avatarUrl || '',
         }));
+        setAvatarPreview(user.avatarUrl || parsed.avatarUrl || null);
       } catch {
         // ignore malformed local data
       }
@@ -65,7 +70,9 @@ export default function SettingsPage() {
         ...prev,
         name: user.name || prev.name,
         username: user.username || prev.username,
+        avatarUrl: user.avatarUrl || prev.avatarUrl || '',
       }));
+      setAvatarPreview(user.avatarUrl || null);
     }
   }, [user]);
 
@@ -113,6 +120,7 @@ export default function SettingsPage() {
         ...user,
         name: response.data.name,
         username: response.data.username,
+        avatarUrl: profileData.avatarUrl || null,
       });
 
       localStorage.setItem(
@@ -124,6 +132,7 @@ export default function SettingsPage() {
           address: profileData.address,
           city: profileData.city,
           state: profileData.state,
+          avatarUrl: profileData.avatarUrl,
         })
       );
       setProfileData((prev) => ({
@@ -137,6 +146,37 @@ export default function SettingsPage() {
       console.error('Profile update failed:', err);
       setProfileStatus(err.response?.data?.message || 'Failed to update profile.');
     }
+  };
+
+
+  const handleAvatarChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const maxSizeInBytes = 2 * 1024 * 1024;
+    if (!file.type.startsWith('image/')) {
+      setProfileStatus('Please choose a valid image file.');
+      event.target.value = '';
+      return;
+    }
+
+    if (file.size > maxSizeInBytes) {
+      setProfileStatus('Image must be 2MB or smaller.');
+      event.target.value = '';
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = typeof reader.result === 'string' ? reader.result : '';
+      setAvatarPreview(result);
+      setProfileData((prev) => ({ ...prev, avatarUrl: result }));
+      setProfileStatus('Avatar selected. Click “Save Changes” to apply it.');
+    };
+    reader.onerror = () => {
+      setProfileStatus('Failed to read image file. Please try another one.');
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleHotelUpdate = async (e: React.FormEvent) => {
@@ -255,14 +295,42 @@ export default function SettingsPage() {
             <form onSubmit={handleProfileUpdate} className="space-y-6">
               {/* Avatar Section */}
               <div className="flex items-center gap-6">
-                <div className="w-20 h-20 rounded-full bg-blue-600 flex items-center justify-center text-white text-3xl font-bold">
-                  {user?.name.charAt(0)}
+                <div className="w-20 h-20 rounded-full bg-blue-600 flex items-center justify-center text-white text-3xl font-bold overflow-hidden">
+                  {avatarPreview ? (
+                    <img src={avatarPreview} alt={`${profileData.name || 'User'} avatar`} className="w-full h-full object-cover" />
+                  ) : (
+                    (profileData.name || user?.name || 'U').charAt(0).toUpperCase()
+                  )}
                 </div>
                 <div>
-                  <button type="button" className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-bold hover:bg-blue-700 transition-colors">
+                  <input
+                    ref={avatarInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleAvatarChange}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => avatarInputRef.current?.click()}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-bold hover:bg-blue-700 transition-colors"
+                  >
                     Change Photo
                   </button>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">JPG, GIF or PNG. Max size of 2MB</p>
+                  {avatarPreview && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAvatarPreview(null);
+                        setProfileData((prev) => ({ ...prev, avatarUrl: '' }));
+                        setProfileStatus('Avatar removed. Click “Save Changes” to apply it.');
+                      }}
+                      className="ml-2 px-4 py-2 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded-lg text-sm font-bold hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                    >
+                      Remove
+                    </button>
+                  )}
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">JPG, GIF, PNG or WEBP. Max size of 2MB</p>
                 </div>
               </div>
 
