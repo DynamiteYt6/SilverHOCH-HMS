@@ -26,7 +26,6 @@ router.get(
           name: true,
           username: true,
           role: true,
-          avatarUrl: true,
           isActive: true,
           createdAt: true,
         },
@@ -99,7 +98,6 @@ router.patch(
           name: true,
           username: true,
           role: true,
-          avatarUrl: true,
           isActive: true,
           createdAt: true,
         }

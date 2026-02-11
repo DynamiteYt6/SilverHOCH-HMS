@@ -8,7 +8,6 @@ export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<'profile' | 'hotel' | 'system'>('profile');
   const [profileStatus, setProfileStatus] = useState<string | null>(null);
   const [settingsStatus, setSettingsStatus] = useState<string | null>(null);
-  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
 
   // Profile settings state
   const [profileData, setProfileData] = useState({
@@ -62,109 +61,27 @@ export default function SettingsPage() {
         // ignore malformed local data
       }
     } else {
-      setProfileData((prev) => ({
-        ...prev,
-        name: user.name || prev.name,
-        username: user.username || prev.username,
-      }));
+      setProfileData((prev) => ({ ...prev, name: user.name || prev.name }));
     }
   }, [user]);
-
-  useEffect(() => {
-    const fetchSettings = async () => {
-      try {
-        const response = await api.get('/api/settings');
-        const data = response.data;
-        setHotelData((prev) => ({ ...prev, ...(data.hotel || {}) }));
-        if (data.pricing) {
-          setPricing({
-            fanOvernightPrice: String(data.pricing.fanOvernightPrice ?? pricing.fanOvernightPrice),
-            fanShortStayPrice: String(data.pricing.fanShortStayPrice ?? pricing.fanShortStayPrice),
-            acOvernightPrice: String(data.pricing.acOvernightPrice ?? pricing.acOvernightPrice),
-            acShortStayPrice: String(data.pricing.acShortStayPrice ?? pricing.acShortStayPrice),
-          });
-        }
-      } catch (error) {
-        console.error('Failed to load settings:', error);
-      }
-    };
-
-    fetchSettings();
-  }, []);
-
-
-  const getAvatarUrl = () => {
-    if (!user?.avatarUrl) return null;
-    if (user.avatarUrl.startsWith('http')) return user.avatarUrl;
-    const baseUrl = api.defaults.baseURL ?? window.location.origin;
-    return `${baseUrl}${user.avatarUrl}`;
-  };
-
-  const handleAvatarUpload = async (file?: File) => {
-    if (!file || !user) return;
-    if (file.size > 2 * 1024 * 1024) {
-      setProfileStatus('Avatar must be 2MB or smaller.');
-      return;
-    }
-
-    try {
-      setIsUploadingAvatar(true);
-      setProfileStatus(null);
-      const imageData = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = () => reject(reader.error);
-        reader.readAsDataURL(file);
-      });
-
-      const response = await api.post('/api/users/me/avatar', {
-        imageData,
-        fileName: file.name,
-      });
-
-      updateUser({
-        ...user,
-        name: response.data.name,
-        username: response.data.username,
-        avatarUrl: response.data.avatarUrl,
-      });
-      setProfileStatus('Profile image updated successfully.');
-    } catch (err: any) {
-      console.error('Avatar upload failed:', err);
-      setProfileStatus(err.response?.data?.message || 'Failed to upload avatar.');
-    } finally {
-      setIsUploadingAvatar(false);
-    }
-  };
 
   const handleProfileUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
     setProfileStatus(null);
 
-    if (profileData.newPassword && profileData.newPassword !== profileData.confirmPassword) {
-      setProfileStatus('New password and confirm password do not match.');
-      return;
-    }
-
     try {
-      const response = await api.patch('/api/users/me', {
-        name: profileData.name,
-        username: profileData.username,
-        currentPassword: profileData.currentPassword || undefined,
-        newPassword: profileData.newPassword || undefined,
-      });
-
-      updateUser({
-        ...user,
-        name: response.data.name,
-        username: response.data.username,
-      });
+      if (profileData.name && profileData.name !== user.name) {
+        const response = await api.patch(`/api/users/${user.id}`, {
+          name: profileData.name
+        });
+        updateUser({ ...user, name: response.data.name });
+      }
 
       localStorage.setItem(
         'profileExtras',
         JSON.stringify({
-          username: response.data.username || profileData.username,
+          username: profileData.username,
           email: profileData.email,
           phone: profileData.phone,
           address: profileData.address,
@@ -607,12 +524,12 @@ export default function SettingsPage() {
               </div>
             </div>
           </div>
-          </div>
-        )}
+        </div>
+      )}
 
-        {/* System Tab */}
-        {activeTab === 'system' && (
-          <div className="max-w-3xl mx-auto space-y-6">
+      {/* System Tab */}
+      {activeTab === 'system' && (
+        <div className="max-w-3xl space-y-6">
           {/* Backup & Restore */}
           <div className="bg-white dark:bg-[#1a2130] rounded-xl border border-gray-200 dark:border-gray-800 p-6">
             <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Backup & Restore</h2>

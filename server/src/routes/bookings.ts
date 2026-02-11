@@ -17,7 +17,7 @@ router.post(
   requireRole(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.FRONT_DESK),
   async (req: AuthRequest, res) => {
     try {
-      const { roomId, stayType, paymentMethod, guestName, guestPhone, guestEmail, guestAddress, numberOfNights } = req.body;
+      const { roomId, stayType, paymentMethod, guestName, guestPhone, guestEmail, guestAddress } = req.body;
 
       // Validation
       if (!roomId || !stayType || !paymentMethod) {
@@ -50,20 +50,19 @@ router.post(
       const pricing = settings.pricing;
       let price: number;
       if (room.type === "FAN") {
-        price = stayType === StayType.OVERNIGHT ? pricing.fanOvernightPrice * nights : pricing.fanShortStayPrice;
+        price = stayType === StayType.OVERNIGHT ? pricing.fanOvernightPrice : pricing.fanShortStayPrice;
       } else {
         // AC room
-        price = stayType === StayType.OVERNIGHT ? pricing.acOvernightPrice * nights : pricing.acShortStayPrice;
+        price = stayType === StayType.OVERNIGHT ? pricing.acOvernightPrice : pricing.acShortStayPrice;
       }
 
-      const bookingMetadata = {
+      const guestPayload = {
         guestName: typeof guestName === "string" ? guestName.trim() : "",
         guestPhone: typeof guestPhone === "string" ? guestPhone.trim() : "",
         guestEmail: typeof guestEmail === "string" ? guestEmail.trim() : "",
         guestAddress: typeof guestAddress === "string" ? guestAddress.trim() : "",
-        numberOfNights: nights,
       };
-      const hasMetadata = Object.entries(bookingMetadata).some(([key, value]) => key === "numberOfNights" ? Number(value) > 1 : Boolean(value));
+      const hasGuestData = Object.values(guestPayload).some(Boolean);
 
       // Calculate times
       const checkIn = new Date();
@@ -111,7 +110,7 @@ router.post(
             price,
             createdById: req.user!.id,
             businessDayId: businessDay.id,
-            note: hasMetadata ? JSON.stringify(bookingMetadata) : null,
+            note: hasGuestData ? JSON.stringify(guestPayload) : null,
           },
           include: {
             room: true,

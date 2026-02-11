@@ -42,7 +42,6 @@ export default function BookingsPage() {
     guestPhone: '',
     guestEmail: '',
     guestAddress: '',
-    numberOfNights: 1,
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -109,7 +108,6 @@ export default function BookingsPage() {
         guestPhone: '',
         guestEmail: '',
         guestAddress: '',
-        numberOfNights: 1,
       });
       setShowCreateModal(false);
     } catch (error: any) {
@@ -143,9 +141,9 @@ export default function BookingsPage() {
     if (!selectedRoom) return 0;
 
     if (selectedRoom.type === 'FAN') {
-      return formData.stayType === 'OVERNIGHT' ? pricingSettings.fanOvernightPrice * formData.numberOfNights : pricingSettings.fanShortStayPrice;
+      return formData.stayType === 'OVERNIGHT' ? pricingSettings.fanOvernightPrice : pricingSettings.fanShortStayPrice;
     }
-    return formData.stayType === 'OVERNIGHT' ? pricingSettings.acOvernightPrice * formData.numberOfNights : pricingSettings.acShortStayPrice;
+    return formData.stayType === 'OVERNIGHT' ? pricingSettings.acOvernightPrice : pricingSettings.acShortStayPrice;
   };
 
   const formatDate = (dateString: string) => {
@@ -370,20 +368,6 @@ export default function BookingsPage() {
                   <option value="SHORT_STAY">Short Stay (90 mins)</option>
                 </select>
               </div>
-
-              {formData.stayType === 'OVERNIGHT' && (
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Number of Nights</label>
-                  <input
-                    type="number"
-                    min={1}
-                    max={30}
-                    value={formData.numberOfNights}
-                    onChange={(e) => setFormData({ ...formData, numberOfNights: Math.max(1, Number(e.target.value) || 1) })}
-                    className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-2.5 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
-                  />
-                </div>
-              )}
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
