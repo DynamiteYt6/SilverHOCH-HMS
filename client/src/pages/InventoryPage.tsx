@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import Layout from '../components/Layout';
 import api from '../services/api';
+import { useAuth } from '../context/AuthContext';
 import type { InventoryItem, Sale, PaymentMethod } from '../types';
 
 interface CartItem {
@@ -9,6 +10,7 @@ interface CartItem {
 }
 
 export default function InventoryPage() {
+  const { user } = useAuth();
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [sales, setSales] = useState<Sale[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -21,6 +23,17 @@ export default function InventoryPage() {
   const [isProcessingSale, setIsProcessingSale] = useState(false);
   const [saleSuccess, setSaleSuccess] = useState(false);
   const [uploadingItemId, setUploadingItemId] = useState<string | null>(null);
+  const [isAddItemOpen, setIsAddItemOpen] = useState(false);
+  const [isAddingItem, setIsAddingItem] = useState(false);
+  const [addItemError, setAddItemError] = useState<string | null>(null);
+  const [newItem, setNewItem] = useState({
+    name: '',
+    category: 'DRINK' as 'DRINK' | 'CONDOM',
+    quantity: '',
+    price: '',
+  });
+
+  const canAddInventory = user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN';
 
   useEffect(() => {
     const fetchData = async () => {
@@ -111,6 +124,48 @@ export default function InventoryPage() {
       setError(err.response?.data?.message || 'Failed to process sale');
     } finally {
       setIsProcessingSale(false);
+    }
+  };
+
+
+  const handleAddInventoryItem = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAddItemError(null);
+
+    const parsedQuantity = Number(newItem.quantity);
+    const parsedPrice = Number(newItem.price);
+
+    if (!newItem.name.trim()) {
+      setAddItemError('Item name is required.');
+      return;
+    }
+
+    if (!Number.isInteger(parsedQuantity) || parsedQuantity < 0) {
+      setAddItemError('Quantity must be 0 or greater.');
+      return;
+    }
+
+    if (!Number.isFinite(parsedPrice) || parsedPrice <= 0) {
+      setAddItemError('Price must be greater than 0.');
+      return;
+    }
+
+    try {
+      setIsAddingItem(true);
+      const response = await api.post<InventoryItem>('/api/inventory', {
+        name: newItem.name.trim(),
+        category: newItem.category,
+        quantity: parsedQuantity,
+        price: parsedPrice,
+      });
+
+      setInventory((prev) => [...prev, response.data].sort((a, b) => a.name.localeCompare(b.name)));
+      setIsAddItemOpen(false);
+      setNewItem({ name: '', category: 'DRINK', quantity: '', price: '' });
+    } catch (err: any) {
+      setAddItemError(err.response?.data?.message || 'Failed to add inventory item.');
+    } finally {
+      setIsAddingItem(false);
     }
   };
 
@@ -277,12 +332,24 @@ export default function InventoryPage() {
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Inventory & Sales</h1>
           <p className="text-gray-500 dark:text-gray-400 text-sm">Manage stock and process sales</p>
         </div>
-        <button className="px-4 py-2 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg text-sm font-semibold hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors flex items-center gap-2">
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-          </svg>
-          Export
-        </button>
+        {canAddInventory ? (
+          <button
+            onClick={() => {
+              setAddItemError(null);
+              setIsAddItemOpen(true);
+            }}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 transition-colors flex items-center gap-2"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            Add Item
+          </button>
+        ) : (
+          <span className="text-xs font-semibold px-3 py-2 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400">
+            Only admin or super admin can add inventory
+          </span>
+        )}
       </div>
 
       {/* Sale Interface */}
@@ -439,6 +506,69 @@ export default function InventoryPage() {
           </div>
         </div>
       </div>
+
+
+      {isAddItemOpen && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+          <div className="w-full max-w-md bg-white dark:bg-[#1a2130] rounded-xl border border-gray-200 dark:border-gray-800 p-6">
+            <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-4">Add Inventory Item</h2>
+            {addItemError && <p className="mb-3 text-sm text-red-600 dark:text-red-400">{addItemError}</p>}
+            <form onSubmit={handleAddInventoryItem} className="space-y-4">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">Item Name</label>
+                <input
+                  type="text"
+                  value={newItem.name}
+                  onChange={(e) => setNewItem((prev) => ({ ...prev, name: e.target.value }))}
+                  className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-gray-900 dark:text-white"
+                  required
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">Category</label>
+                  <select
+                    value={newItem.category}
+                    onChange={(e) => setNewItem((prev) => ({ ...prev, category: e.target.value as 'DRINK' | 'CONDOM' }))}
+                    className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-gray-900 dark:text-white"
+                  >
+                    <option value="DRINK">DRINK</option>
+                    <option value="CONDOM">CONDOM</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">Quantity</label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={newItem.quantity}
+                    onChange={(e) => setNewItem((prev) => ({ ...prev, quantity: e.target.value }))}
+                    className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-gray-900 dark:text-white"
+                    required
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">Price (₦)</label>
+                <input
+                  type="number"
+                  min={1}
+                  value={newItem.price}
+                  onChange={(e) => setNewItem((prev) => ({ ...prev, price: e.target.value }))}
+                  className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-gray-900 dark:text-white"
+                  required
+                />
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <button type="button" onClick={() => setIsAddItemOpen(false)} className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300">Cancel</button>
+                <button type="submit" disabled={isAddingItem} className="px-4 py-2 rounded-lg bg-blue-600 text-white font-semibold disabled:opacity-50">
+                  {isAddingItem ? 'Adding...' : 'Add Item'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Today's Sales */}
       <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-[#1a2130] overflow-hidden">
