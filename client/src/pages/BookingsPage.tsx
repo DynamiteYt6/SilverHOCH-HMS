@@ -8,12 +8,15 @@ interface Booking {
   id: string;
   room: Room;
   stayType: 'OVERNIGHT' | 'SHORT_STAY';
+  bookingType?: 'NORMAL' | 'COMPLIMENTARY';
   checkIn: string;
   checkOut: string | null;
   price: number;
+  note?: string | null;
   payment: {
-    method: string;
-    status: string;
+    id?: string;
+    method: 'CASH' | 'POS' | 'TRANSFER';
+    status: 'PAID' | 'PENDING';
   };
   createdBy: {
     name: string;
@@ -42,6 +45,9 @@ export default function BookingsPage() {
     guestPhone: '',
     guestEmail: '',
     guestAddress: '',
+    nights: 1,
+    bookingType: 'NORMAL' as 'NORMAL' | 'COMPLIMENTARY',
+    note: '',
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -108,6 +114,9 @@ export default function BookingsPage() {
         guestPhone: '',
         guestEmail: '',
         guestAddress: '',
+        nights: 1,
+        bookingType: 'NORMAL',
+        note: '',
       });
       setShowCreateModal(false);
     } catch (error: any) {
@@ -115,6 +124,29 @@ export default function BookingsPage() {
       alert(error.response?.data?.message || 'Failed to create booking');
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+
+  const handlePaymentStatusChange = async (booking: Booking, status: 'PAID' | 'PENDING') => {
+    if (!booking.payment?.id || booking.payment.status === status) return;
+
+    try {
+      await api.patch(`/api/payments/${booking.payment.id}/status`, { status });
+      await fetchBookings();
+    } catch (error: any) {
+      console.error('Failed to update payment status:', error);
+      alert(error.response?.data?.message || 'Failed to update payment status');
+    }
+  };
+
+  const parseGuestInfo = (note?: string | null) => {
+    if (!note) return null;
+    try {
+      const parsed = JSON.parse(note);
+      return typeof parsed === 'object' && parsed !== null ? parsed : null;
+    } catch {
+      return null;
     }
   };
 
@@ -264,7 +296,9 @@ export default function BookingsPage() {
                         ? 'bg-blue-100 text-blue-800 dark:bg-blue-500/10 dark:text-blue-500'
                         : 'bg-gray-100 text-gray-800 dark:bg-gray-500/10 dark:text-gray-500'
                     }`}>
-                      {booking.stayType === 'SHORT_STAY' ? 'Short Stay' : 'Overnight'}
+                      {booking.stayType === 'SHORT_STAY'
+                        ? 'Short Stay'
+                        : `Overnight${parseGuestInfo(booking.note)?.nights > 1 ? ` (${parseGuestInfo(booking.note)?.nights} nights)` : ''}`}
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
@@ -276,25 +310,35 @@ export default function BookingsPage() {
                     )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900 dark:text-white">
-                    ₦{booking.price.toLocaleString()}
+                    {booking.bookingType === 'COMPLIMENTARY' ? 'Complimentary' : `₦${booking.price.toLocaleString()}`}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex flex-col gap-1">
-                      <span className={`px-2.5 py-1 inline-flex text-xs leading-5 font-bold rounded-full ${getStatusColor(booking.payment.status)}`}>
-                        {booking.payment.status}
-                      </span>
+                      <select
+                        value={booking.payment.status}
+                        onChange={(e) => handlePaymentStatusChange(booking, e.target.value as 'PAID' | 'PENDING')}
+                        className={`px-2 py-1 text-xs leading-5 font-bold rounded-full border ${getStatusColor(booking.payment.status)}`}
+                      >
+                        <option value="PENDING">PENDING</option>
+                        <option value="PAID">PAID</option>
+                      </select>
                       <span className="text-xs text-gray-500 dark:text-gray-400">{booking.payment.method}</span>
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm">
-                    {!booking.checkOut && (
-                      <button
-                        onClick={() => handleCheckout(booking.id)}
-                        className="text-blue-600 hover:text-blue-700 dark:text-blue-500 dark:hover:text-blue-400 font-bold"
-                      >
-                        Check Out
-                      </button>
-                    )}
+                    <div className="space-y-1">
+                      {!booking.checkOut && (
+                        <button
+                          onClick={() => handleCheckout(booking.id)}
+                          className="text-blue-600 hover:text-blue-700 dark:text-blue-500 dark:hover:text-blue-400 font-bold"
+                        >
+                          Check Out
+                        </button>
+                      )}
+                      {parseGuestInfo(booking.note)?.guestName && (
+                        <p className="text-xs text-gray-500 dark:text-gray-400">Guest: {parseGuestInfo(booking.note)?.guestName}</p>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -356,17 +400,40 @@ export default function BookingsPage() {
 
               {/* Stay Type */}
               <div>
-                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                  Stay Type
-                </label>
+                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Stay Type</label>
                 <select
                   value={formData.stayType}
-                  onChange={(e) => setFormData({ ...formData, stayType: e.target.value as any })}
+                  onChange={(e) => setFormData({ ...formData, stayType: e.target.value as 'OVERNIGHT' | 'SHORT_STAY' })}
                   className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-2.5 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
                 >
                   <option value="OVERNIGHT">Overnight</option>
                   <option value="SHORT_STAY">Short Stay (90 mins)</option>
                 </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Booking Type</label>
+                  <select
+                    value={formData.bookingType}
+                    onChange={(e) => setFormData({ ...formData, bookingType: e.target.value as 'NORMAL' | 'COMPLIMENTARY' })}
+                    className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-2.5 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
+                  >
+                    <option value="NORMAL">Normal</option>
+                    <option value="COMPLIMENTARY">Complimentary</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Nights</label>
+                  <input
+                    type="number"
+                    min={1}
+                    value={formData.nights}
+                    onChange={(e) => setFormData({ ...formData, nights: Number(e.target.value || 1) })}
+                    disabled={formData.stayType !== 'OVERNIGHT'}
+                    className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-2.5 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-600 focus:border-blue-600 disabled:opacity-50"
+                  />
+                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
@@ -411,6 +478,16 @@ export default function BookingsPage() {
                 </div>
               </div>
 
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Notes (Optional)</label>
+                <textarea
+                  value={formData.note}
+                  onChange={(e) => setFormData({ ...formData, note: e.target.value })}
+                  rows={2}
+                  className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-2.5 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
+                />
+              </div>
+
               {/* Payment Method */}
               <div>
                 <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
@@ -421,8 +498,9 @@ export default function BookingsPage() {
                     <button
                       key={method}
                       type="button"
-                      onClick={() => setFormData({ ...formData, paymentMethod: method as any })}
-                      className={`py-2 px-3 rounded-lg text-xs font-bold uppercase transition-colors ${
+                      onClick={() => setFormData({ ...formData, paymentMethod: method as 'CASH' | 'POS' | 'TRANSFER' })}
+                      disabled={formData.bookingType === 'COMPLIMENTARY'}
+                      className={`py-2 px-3 rounded-lg text-xs font-bold uppercase transition-colors disabled:opacity-50 ${
                         formData.paymentMethod === method
                           ? 'bg-blue-600 text-white'
                           : 'border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:border-blue-600'
@@ -439,7 +517,7 @@ export default function BookingsPage() {
                 <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
                   <div className="flex justify-between items-center">
                     <span className="text-sm text-gray-600 dark:text-gray-400">Total Amount</span>
-                    <span className="text-2xl font-black text-blue-600">₦{getPrice().toLocaleString()}</span>
+                    <span className="text-2xl font-black text-blue-600">{formData.bookingType === 'COMPLIMENTARY' ? 'Complimentary' : `₦${(formData.stayType === 'OVERNIGHT' ? getPrice() * formData.nights : getPrice()).toLocaleString()}`}</span>
                   </div>
                 </div>
               )}

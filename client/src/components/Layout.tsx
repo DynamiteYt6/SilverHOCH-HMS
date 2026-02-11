@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
@@ -13,11 +13,66 @@ export default function Layout({ children }: LayoutProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isNotificationOpen, setIsNotificationOpen] = useState(false);
+  const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
+  const notificationRef = useRef<HTMLDivElement>(null);
+  const profileMenuRef = useRef<HTMLDivElement>(null);
+
+  const notifications = useMemo(
+    () => [
+      {
+        id: 'booking',
+        title: 'Quick booking available',
+        description: 'Tap “Quick Booking” to create a reservation instantly.',
+        time: 'Now',
+        isNew: true,
+      },
+      {
+        id: 'system',
+        title: 'System update complete',
+        description: 'All dashboard modules are synced and running.',
+        time: '5 mins ago',
+        isNew: true,
+      },
+      {
+        id: 'security',
+        title: 'Security reminder',
+        description: 'Review account settings and update your password regularly.',
+        time: '1 day ago',
+        isNew: false,
+      },
+    ],
+    []
+  );
+
+  const unreadCount = notifications.filter((item) => item.isNew).length;
+  const userInitial = user?.name?.charAt(0).toUpperCase() ?? 'U';
+  const userAvatarUrl = user?.avatarUrl || null;
 
   const handleLogout = () => {
     logout();
     navigate('/login');
   };
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Node;
+
+      if (notificationRef.current && !notificationRef.current.contains(target)) {
+        setIsNotificationOpen(false);
+      }
+
+      if (profileMenuRef.current && !profileMenuRef.current.contains(target)) {
+        setIsProfileMenuOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   const isActive = (path: string) => location.pathname === path;
 
@@ -170,8 +225,12 @@ export default function Layout({ children }: LayoutProps) {
         {/* User Profile */}
         <div className="p-3 border-t border-gray-200 dark:border-gray-800 mt-auto">
           <div className={`flex items-center gap-2 p-2 ${isCollapsed ? 'flex-col justify-center' : ''}`}>
-            <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold shrink-0 text-sm">
-              {user?.name.charAt(0)}
+            <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold shrink-0 text-sm overflow-hidden">
+              {userAvatarUrl ? (
+                <img src={userAvatarUrl} alt={user?.name ?? 'User avatar'} className="w-full h-full object-cover" />
+              ) : (
+                userInitial
+              )}
             </div>
             {!isCollapsed && (
               <div className="overflow-hidden flex-1 min-w-0">
@@ -224,14 +283,98 @@ export default function Layout({ children }: LayoutProps) {
               )}
             </button>
 
-            <button className="w-9 h-9 flex items-center justify-center rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-white relative">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-              </svg>
-              <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border border-white dark:border-gray-800"></span>
-            </button>
+            <div className="relative" ref={notificationRef}>
+              <button
+                onClick={() => {
+                  setIsNotificationOpen((prev) => !prev);
+                  setIsProfileMenuOpen(false);
+                }}
+                className="w-9 h-9 flex items-center justify-center rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-white relative hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                aria-label="Toggle notifications"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                </svg>
+                {unreadCount > 0 && (
+                  <span className="absolute top-1.5 right-1.5 min-w-4 h-4 px-1 rounded-full bg-red-500 text-white text-[10px] leading-4 font-bold border border-white dark:border-gray-800">
+                    {unreadCount}
+                  </span>
+                )}
+              </button>
+
+              {isNotificationOpen && (
+                <div className="absolute right-0 mt-2 w-80 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-[#161d2b] shadow-xl z-50">
+                  <div className="p-3 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between">
+                    <p className="text-sm font-semibold text-gray-900 dark:text-white">Notifications</p>
+                    <span className="text-xs text-blue-600 dark:text-blue-400">{unreadCount} new</span>
+                  </div>
+                  <div className="max-h-72 overflow-y-auto">
+                    {notifications.map((item) => (
+                      <button
+                        key={item.id}
+                        onClick={() => setIsNotificationOpen(false)}
+                        className="w-full text-left px-3 py-2.5 hover:bg-gray-50 dark:hover:bg-gray-800/70 transition-colors border-b border-gray-100 dark:border-gray-800 last:border-b-0"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <p className="text-sm font-medium text-gray-800 dark:text-gray-100">{item.title}</p>
+                          {item.isNew && <span className="w-2 h-2 rounded-full bg-blue-600 mt-1" />}
+                        </div>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{item.description}</p>
+                        <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-1">{item.time}</p>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
 
             <div className="h-6 w-[1px] bg-gray-200 dark:bg-gray-800 mx-1"></div>
+
+            <div className="relative" ref={profileMenuRef}>
+              <button
+                onClick={() => {
+                  setIsProfileMenuOpen((prev) => !prev);
+                  setIsNotificationOpen(false);
+                }}
+                className="h-9 pl-1 pr-2 rounded-lg bg-gray-100 dark:bg-gray-800 flex items-center gap-2 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                aria-label="Open profile menu"
+              >
+                <span className="w-7 h-7 rounded-full bg-blue-600 text-white font-bold text-xs flex items-center justify-center overflow-hidden">
+                  {userAvatarUrl ? (
+                    <img src={userAvatarUrl} alt={user?.name ?? 'User avatar'} className="w-full h-full object-cover" />
+                  ) : (
+                    userInitial
+                  )}
+                </span>
+                <svg className={`w-4 h-4 text-gray-500 dark:text-gray-300 transition-transform ${isProfileMenuOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+
+              {isProfileMenuOpen && (
+                <div className="absolute right-0 mt-2 w-52 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-[#161d2b] shadow-xl z-50 p-1">
+                  <div className="px-3 py-2 border-b border-gray-100 dark:border-gray-700 mb-1">
+                    <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">{user?.name ?? 'User'}</p>
+                    <p className="text-[11px] uppercase text-gray-500 dark:text-gray-400 truncate">{user?.role.replace('_', ' ') ?? 'staff'}</p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      navigate('/settings');
+                      setIsProfileMenuOpen(false);
+                    }}
+                    className="w-full text-left px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg"
+                  >
+                    My Profile
+                  </button>
+                  <button
+                    onClick={handleLogout}
+                    className="w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg"
+                  >
+                    Logout
+                  </button>
+                </div>
+              )}
+            </div>
 
             <button
               onClick={() => navigate('/bookings?quick=1')}
