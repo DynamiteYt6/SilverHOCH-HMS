@@ -315,14 +315,15 @@ export default function BookingsPage() {
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex flex-col gap-1">
                       <select
-                        value={booking.payment.status}
+                        value={booking.payment?.status ?? 'PENDING'}
                         onChange={(e) => handlePaymentStatusChange(booking, e.target.value as 'PAID' | 'PENDING')}
-                        className={`px-2 py-1 text-xs leading-5 font-bold rounded-full border ${getStatusColor(booking.payment.status)}`}
+                        disabled={!booking.payment?.id}
+                        className={`px-2 py-1 text-xs leading-5 font-bold rounded-full focus:outline-none ${getStatusColor(booking.payment?.status ?? 'PENDING')} disabled:opacity-60`}
                       >
                         <option value="PENDING">PENDING</option>
                         <option value="PAID">PAID</option>
                       </select>
-                      <span className="text-xs text-gray-500 dark:text-gray-400">{booking.payment.method}</span>
+                      <span className="text-xs text-gray-500 dark:text-gray-400">{booking.payment?.method ?? 'N/A'}</span>
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm">
@@ -359,7 +360,7 @@ export default function BookingsPage() {
       {/* Create Booking Modal */}
       {showCreateModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-[#1a2130] rounded-xl shadow-2xl max-w-md w-full border border-gray-200 dark:border-gray-800">
+          <div className="bg-white dark:bg-[#1a2130] rounded-xl shadow-2xl max-w-2xl w-full border border-gray-200 dark:border-gray-800 max-h-[90vh] overflow-hidden">
             {/* Modal Header */}
             <div className="flex justify-between items-center p-6 border-b border-gray-200 dark:border-gray-800">
               <h2 className="text-xl font-bold text-gray-900 dark:text-white">New Booking</h2>
@@ -374,7 +375,7 @@ export default function BookingsPage() {
             </div>
 
             {/* Modal Body */}
-            <form onSubmit={handleCreateBooking} className="p-6 space-y-4">
+            <form onSubmit={handleCreateBooking} className="p-6 space-y-4 overflow-y-auto max-h-[calc(90vh-84px)]">
               {/* Room Selection */}
               <div>
                 <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">

@@ -40,18 +40,6 @@ router.patch(
         return res.status(404).json({ message: "Payment not found" });
       }
 
-      // Check if business day is locked
-      const booking = await prisma.booking.findUnique({
-        where: { id: existingPayment.bookingId },
-        include: { businessDay: true }
-      });
-
-      if (booking?.businessDay.isLocked) {
-        return res.status(400).json({ 
-          message: "Cannot update payment: Business day is locked" 
-        });
-      }
-
       // Update payment status
       const payment = await prisma.payment.update({
         where: { id },
