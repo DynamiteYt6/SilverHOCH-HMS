@@ -1,10 +1,14 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Layout from '../components/Layout';
 import { useAuth } from '../context/AuthContext';
+import api from '../services/api';
 
 export default function SettingsPage() {
-  const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState<'profile' | 'hotel' | 'users' | 'system'>('profile');
+  const { user, updateUser } = useAuth();
+  const [activeTab, setActiveTab] = useState<'profile' | 'hotel' | 'system'>('profile');
+  const [profileStatus, setProfileStatus] = useState<string | null>(null);
+  const [settingsStatus, setSettingsStatus] = useState<string | null>(null);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
 
   // Profile settings state
   const [profileData, setProfileData] = useState({
@@ -12,6 +16,9 @@ export default function SettingsPage() {
     username: '',
     email: '',
     phone: '',
+    address: '',
+    city: '',
+    state: '',
     currentPassword: '',
     newPassword: '',
     confirmPassword: '',
@@ -39,35 +46,205 @@ export default function SettingsPage() {
     acShortStayPrice: '10000',
   });
 
-  const handleProfileUpdate = (e: React.FormEvent) => {
-    e.preventDefault();
-    // TODO: Implement API call to update profile
-    alert('Profile update functionality coming soon!');
+  useEffect(() => {
+    if (!user) return;
+    const stored = localStorage.getItem('profileExtras');
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored) as Partial<typeof profileData>;
+        setProfileData((prev) => ({
+          ...prev,
+          ...parsed,
+          name: user.name || prev.name,
+          username: user.username || parsed.username || prev.username,
+        }));
+      } catch {
+        // ignore malformed local data
+      }
+    } else {
+      setProfileData((prev) => ({
+        ...prev,
+        name: user.name || prev.name,
+        username: user.username || prev.username,
+      }));
+    }
+  }, [user]);
+
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const response = await api.get('/api/settings');
+        const data = response.data;
+        setHotelData((prev) => ({ ...prev, ...(data.hotel || {}) }));
+        if (data.pricing) {
+          setPricing({
+            fanOvernightPrice: String(data.pricing.fanOvernightPrice ?? pricing.fanOvernightPrice),
+            fanShortStayPrice: String(data.pricing.fanShortStayPrice ?? pricing.fanShortStayPrice),
+            acOvernightPrice: String(data.pricing.acOvernightPrice ?? pricing.acOvernightPrice),
+            acShortStayPrice: String(data.pricing.acShortStayPrice ?? pricing.acShortStayPrice),
+          });
+        }
+      } catch (error) {
+        console.error('Failed to load settings:', error);
+      }
+    };
+
+    fetchSettings();
+  }, []);
+
+
+  const getAvatarUrl = () => {
+    if (!user?.avatarUrl) return null;
+    if (user.avatarUrl.startsWith('http')) return user.avatarUrl;
+    const baseUrl = api.defaults.baseURL ?? window.location.origin;
+    return `${baseUrl}${user.avatarUrl}`;
   };
 
-  const handleHotelUpdate = (e: React.FormEvent) => {
-    e.preventDefault();
-    // TODO: Implement API call to update hotel settings
-    alert('Hotel settings update functionality coming soon!');
+  const handleAvatarUpload = async (file?: File) => {
+    if (!file || !user) return;
+    if (file.size > 2 * 1024 * 1024) {
+      setProfileStatus('Avatar must be 2MB or smaller.');
+      return;
+    }
+
+    try {
+      setIsUploadingAvatar(true);
+      setProfileStatus(null);
+      const imageData = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = () => reject(reader.error);
+        reader.readAsDataURL(file);
+      });
+
+      const response = await api.post('/api/users/me/avatar', {
+        imageData,
+        fileName: file.name,
+      });
+
+      updateUser({
+        ...user,
+        name: response.data.name,
+        username: response.data.username,
+        avatarUrl: response.data.avatarUrl,
+      });
+      setProfileStatus('Profile image updated successfully.');
+    } catch (err: any) {
+      console.error('Avatar upload failed:', err);
+      setProfileStatus(err.response?.data?.message || 'Failed to upload avatar.');
+    } finally {
+      setIsUploadingAvatar(false);
+    }
   };
 
-  const handlePricingUpdate = (e: React.FormEvent) => {
+  const handleProfileUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
-    // TODO: Implement API call to update pricing
-    alert('Pricing update functionality coming soon!');
+    if (!user) return;
+    setProfileStatus(null);
+
+    if (profileData.newPassword && profileData.newPassword !== profileData.confirmPassword) {
+      setProfileStatus('New password and confirm password do not match.');
+      return;
+    }
+
+    try {
+      const response = await api.patch('/api/users/me', {
+        name: profileData.name,
+        username: profileData.username,
+        currentPassword: profileData.currentPassword || undefined,
+        newPassword: profileData.newPassword || undefined,
+      });
+
+      updateUser({
+        ...user,
+        name: response.data.name,
+        username: response.data.username,
+      });
+
+      localStorage.setItem(
+        'profileExtras',
+        JSON.stringify({
+          username: response.data.username || profileData.username,
+          email: profileData.email,
+          phone: profileData.phone,
+          address: profileData.address,
+          city: profileData.city,
+          state: profileData.state,
+        })
+      );
+      setProfileData((prev) => ({
+        ...prev,
+        currentPassword: '',
+        newPassword: '',
+        confirmPassword: '',
+      }));
+      setProfileStatus('Profile updated successfully.');
+    } catch (err: any) {
+      console.error('Profile update failed:', err);
+      setProfileStatus(err.response?.data?.message || 'Failed to update profile.');
+    }
+  };
+
+  const handleHotelUpdate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      setSettingsStatus(null);
+      const response = await api.patch('/api/settings', {
+        hotel: hotelData,
+      });
+      setHotelData((prev) => ({ ...prev, ...(response.data.hotel || {}) }));
+      setSettingsStatus('Hotel information saved successfully.');
+    } catch (err: any) {
+      console.error('Failed to save hotel settings:', err);
+      setSettingsStatus(err.response?.data?.message || 'Failed to save hotel settings.');
+    }
+  };
+
+  const handlePricingUpdate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      setSettingsStatus(null);
+      const response = await api.patch('/api/settings', {
+        pricing: {
+          fanOvernightPrice: Number(pricing.fanOvernightPrice),
+          fanShortStayPrice: Number(pricing.fanShortStayPrice),
+          acOvernightPrice: Number(pricing.acOvernightPrice),
+          acShortStayPrice: Number(pricing.acShortStayPrice),
+        }
+      });
+      if (response.data.pricing) {
+        setPricing({
+          fanOvernightPrice: String(response.data.pricing.fanOvernightPrice),
+          fanShortStayPrice: String(response.data.pricing.fanShortStayPrice),
+          acOvernightPrice: String(response.data.pricing.acOvernightPrice),
+          acShortStayPrice: String(response.data.pricing.acShortStayPrice),
+        });
+      }
+      setSettingsStatus('Pricing settings saved successfully.');
+    } catch (err: any) {
+      console.error('Failed to save pricing settings:', err);
+      setSettingsStatus(err.response?.data?.message || 'Failed to save pricing settings.');
+    }
   };
 
   return (
     <Layout>
-      {/* Page Header */}
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Settings</h1>
-        <p className="text-gray-600 dark:text-gray-400 mt-1">Manage your account and hotel preferences</p>
-      </div>
+      <div className="max-w-4xl mx-auto w-full">
+        {/* Page Header */}
+        <div className="mb-6 text-center">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Settings</h1>
+          <p className="text-gray-600 dark:text-gray-400 mt-1">Manage your account and hotel preferences</p>
+        </div>
 
-      {/* Tabs */}
-      <div className="border-b border-gray-200 dark:border-gray-800 mb-6">
-        <div className="flex gap-8">
+        {settingsStatus && (
+          <div className="mb-4 p-3 rounded-lg bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-300 border border-blue-100 dark:border-blue-500/30 text-center">
+            {settingsStatus}
+          </div>
+        )}
+
+        {/* Tabs */}
+        <div className="border-b border-gray-200 dark:border-gray-800 mb-6">
+          <div className="flex flex-wrap justify-center gap-6">
           <button
             onClick={() => setActiveTab('profile')}
             className={`py-4 border-b-2 transition-colors ${
@@ -94,21 +271,6 @@ export default function SettingsPage() {
             </svg>
             Hotel
           </button>
-          {(user?.role === 'SUPER_ADMIN' || user?.role === 'ADMIN') && (
-            <button
-              onClick={() => setActiveTab('users')}
-              className={`py-4 border-b-2 transition-colors ${
-                activeTab === 'users'
-                  ? 'border-blue-600 text-blue-600'
-                  : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-white'
-              } text-sm font-bold flex items-center gap-2`}
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-              </svg>
-              Users
-            </button>
-          )}
           <button
             onClick={() => setActiveTab('system')}
             className={`py-4 border-b-2 transition-colors ${
@@ -123,24 +285,44 @@ export default function SettingsPage() {
             </svg>
             System
           </button>
+          </div>
         </div>
-      </div>
 
-      {/* Profile Tab */}
-      {activeTab === 'profile' && (
-        <div className="max-w-3xl">
+        {/* Profile Tab */}
+        {activeTab === 'profile' && (
+          <div className="max-w-3xl mx-auto">
           <div className="bg-white dark:bg-[#1a2130] rounded-xl border border-gray-200 dark:border-gray-800 p-6">
             <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-6">Profile Information</h2>
+            {profileStatus && (
+              <div className="mb-4 p-3 rounded-lg bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-300 border border-blue-100 dark:border-blue-500/30">
+                {profileStatus}
+              </div>
+            )}
             <form onSubmit={handleProfileUpdate} className="space-y-6">
               {/* Avatar Section */}
               <div className="flex items-center gap-6">
-                <div className="w-20 h-20 rounded-full bg-blue-600 flex items-center justify-center text-white text-3xl font-bold">
-                  {user?.name.charAt(0)}
+                <div className="w-20 h-20 rounded-full bg-blue-600 overflow-hidden flex items-center justify-center text-white text-3xl font-bold">
+                  {getAvatarUrl() ? (
+                    <img src={getAvatarUrl()!} alt="Profile avatar" className="w-full h-full object-cover" />
+                  ) : (
+                    user?.name.charAt(0)
+                  )}
                 </div>
                 <div>
-                  <button type="button" className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-bold hover:bg-blue-700 transition-colors">
-                    Change Photo
-                  </button>
+                  <label className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-bold hover:bg-blue-700 transition-colors cursor-pointer inline-block">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      disabled={isUploadingAvatar}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        handleAvatarUpload(file);
+                        e.currentTarget.value = '';
+                      }}
+                    />
+                    {isUploadingAvatar ? 'Uploading...' : 'Change Photo'}
+                  </label>
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">JPG, GIF or PNG. Max size of 2MB</p>
                 </div>
               </div>
@@ -183,6 +365,39 @@ export default function SettingsPage() {
                     type="tel"
                     value={profileData.phone}
                     onChange={(e) => setProfileData({ ...profileData, phone: e.target.value })}
+                    className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-2.5 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Address</label>
+                  <input
+                    type="text"
+                    value={profileData.address}
+                    onChange={(e) => setProfileData({ ...profileData, address: e.target.value })}
+                    className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-2.5 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">City</label>
+                  <input
+                    type="text"
+                    value={profileData.city}
+                    onChange={(e) => setProfileData({ ...profileData, city: e.target.value })}
+                    className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-2.5 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">State</label>
+                  <input
+                    type="text"
+                    value={profileData.state}
+                    onChange={(e) => setProfileData({ ...profileData, state: e.target.value })}
                     className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-2.5 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
                   />
                 </div>
@@ -234,12 +449,12 @@ export default function SettingsPage() {
               </div>
             </form>
           </div>
-        </div>
-      )}
+          </div>
+        )}
 
-      {/* Hotel Tab */}
-      {activeTab === 'hotel' && (
-        <div className="max-w-3xl space-y-6">
+        {/* Hotel Tab */}
+        {activeTab === 'hotel' && (
+          <div className="max-w-3xl mx-auto space-y-6">
           {/* Hotel Information */}
           <div className="bg-white dark:bg-[#1a2130] rounded-xl border border-gray-200 dark:border-gray-800 p-6">
             <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-6">Hotel Information</h2>
@@ -392,30 +607,12 @@ export default function SettingsPage() {
               </div>
             </div>
           </div>
-        </div>
-      )}
-
-      {/* Users Tab */}
-      {activeTab === 'users' && (user?.role === 'SUPER_ADMIN' || user?.role === 'ADMIN') && (
-        <div className="max-w-4xl">
-          <div className="bg-white dark:bg-[#1a2130] rounded-xl border border-gray-200 dark:border-gray-800 p-6">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-xl font-bold text-gray-900 dark:text-white">User Management</h2>
-              <button className="px-4 py-2 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 transition-colors flex items-center gap-2">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                </svg>
-                Add User
-              </button>
-            </div>
-            <p className="text-gray-600 dark:text-gray-400 text-center py-12">User management coming soon...</p>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* System Tab */}
-      {activeTab === 'system' && (
-        <div className="max-w-3xl space-y-6">
+        {/* System Tab */}
+        {activeTab === 'system' && (
+          <div className="max-w-3xl mx-auto space-y-6">
           {/* Backup & Restore */}
           <div className="bg-white dark:bg-[#1a2130] rounded-xl border border-gray-200 dark:border-gray-800 p-6">
             <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Backup & Restore</h2>
@@ -466,8 +663,9 @@ export default function SettingsPage() {
               </div>
             </div>
           </div>
-        </div>
-      )}
+          </div>
+        )}
+      </div>
     </Layout>
   );
 }

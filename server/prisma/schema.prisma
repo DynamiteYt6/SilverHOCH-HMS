@@ -77,8 +77,9 @@
     name     String
     username String   @unique
     password String
-    role     UserRole
-    isActive Boolean  @default(true)
+    role      UserRole
+    isActive  Boolean  @default(true)
+    avatarUrl String?
 
     bookings Booking[]
     sales    Sale[]
@@ -151,6 +152,7 @@
     category InventoryCategory
     quantity Int
     price    Int
+    imageUrl String?
 
     sales Sale[]
 

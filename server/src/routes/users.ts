@@ -1,11 +1,178 @@
 import { Router } from "express";
+import fs from "fs";
+import path from "path";
 import prisma from "../lib/prisma.js";
 import { requireAuth } from "../middleware/auth.js";
 import { requireRole } from "../middleware/roles.js";
 import { hashPassword } from "../lib/hash.js";
+import { verifyPassword } from "../lib/hash.js";
 import { UserRole } from "@prisma/client";
+import type { AuthRequest } from "../middleware/auth.js";
 
 const router = Router();
+
+// ============================================
+// GET /api/users/me - Get current user profile
+// ============================================
+router.get(
+  "/me",
+  requireAuth,
+  async (req: AuthRequest, res) => {
+    try {
+      const user = await prisma.user.findUnique({
+        where: { id: req.user!.id },
+        select: {
+          id: true,
+          name: true,
+          username: true,
+          role: true,
+          avatarUrl: true,
+          isActive: true,
+          createdAt: true,
+        },
+      });
+
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      res.json(user);
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ message: "Failed to fetch profile" });
+    }
+  }
+);
+
+// ============================================
+// PATCH /api/users/me - Update current user profile
+// ============================================
+router.patch(
+  "/me",
+  requireAuth,
+  async (req: AuthRequest, res) => {
+    try {
+      const { name, username, currentPassword, newPassword } = req.body;
+      const userId = req.user!.id;
+
+      const existingUser = await prisma.user.findUnique({
+        where: { id: userId }
+      });
+
+      if (!existingUser) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const updateData: any = {};
+
+      if (typeof name === "string" && name.trim()) {
+        updateData.name = name.trim();
+      }
+
+      if (typeof username === "string" && username.trim() && username !== existingUser.username) {
+        const conflict = await prisma.user.findUnique({ where: { username } });
+        if (conflict) {
+          return res.status(400).json({ message: "Username already exists" });
+        }
+        updateData.username = username.trim();
+      }
+
+      if (newPassword) {
+        if (!currentPassword) {
+          return res.status(400).json({ message: "Current password is required" });
+        }
+        const validCurrent = await verifyPassword(currentPassword, existingUser.password);
+        if (!validCurrent) {
+          return res.status(400).json({ message: "Current password is incorrect" });
+        }
+        if (newPassword.length < 6) {
+          return res.status(400).json({ message: "New password must be at least 6 characters" });
+        }
+        updateData.password = await hashPassword(newPassword);
+      }
+
+      const updatedUser = await prisma.user.update({
+        where: { id: userId },
+        data: updateData,
+        select: {
+          id: true,
+          name: true,
+          username: true,
+          role: true,
+          avatarUrl: true,
+          isActive: true,
+          createdAt: true,
+        }
+      });
+
+      res.json(updatedUser);
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ message: "Failed to update profile" });
+    }
+  }
+);
+
+
+// ============================================
+// POST /api/users/me/avatar - Upload avatar
+// ============================================
+router.post(
+  "/me/avatar",
+  requireAuth,
+  async (req: AuthRequest, res) => {
+    try {
+      const { imageData, fileName } = req.body;
+
+      if (!imageData || typeof imageData !== "string") {
+        return res.status(400).json({ message: "Image data is required" });
+      }
+
+      const matches = imageData.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/);
+      if (!matches) {
+        return res.status(400).json({ message: "Invalid image data format" });
+      }
+
+      const mimeType = matches[1] ?? "image/jpeg";
+      const base64Data = matches[2];
+      if (!base64Data) {
+        return res.status(400).json({ message: "Invalid image payload" });
+      }
+      const extFromMime = mimeType.split("/")[1] || "jpg";
+      const providedExt = fileName ? path.extname(fileName) : "";
+      const safeExt = (providedExt || `.${extFromMime}`).replace(/[^a-zA-Z0-9.]/g, "").toLowerCase();
+
+      const buffer = Buffer.from(base64Data, "base64");
+      if (buffer.length > 2 * 1024 * 1024) {
+        return res.status(400).json({ message: "Avatar must be 2MB or smaller" });
+      }
+
+      const avatarDir = path.join(process.cwd(), "uploads", "avatars");
+      fs.mkdirSync(avatarDir, { recursive: true });
+      const safeName = `${Date.now()}-${Math.round(Math.random() * 1e9)}${safeExt}`;
+      fs.writeFileSync(path.join(avatarDir, safeName), buffer);
+
+      const updatedUser = await prisma.user.update({
+        where: { id: req.user!.id },
+        data: { avatarUrl: `/uploads/avatars/${safeName}` },
+        select: {
+          id: true,
+          name: true,
+          username: true,
+          role: true,
+          avatarUrl: true,
+          isActive: true,
+          createdAt: true,
+        }
+      });
+
+      res.json(updatedUser);
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ message: "Failed to upload avatar" });
+    }
+  }
+);
 
 // ============================================
 // GET /api/users - Get all users
@@ -22,6 +189,7 @@ router.get(
           name: true,
           username: true,
           role: true,
+          avatarUrl: true,
           isActive: true,
           createdAt: true,
           // Don't send password!
@@ -89,6 +257,7 @@ router.post(
           name: true,
           username: true,
           role: true,
+          avatarUrl: true,
           isActive: true,
           createdAt: true,
           // Don't return password
@@ -150,6 +319,7 @@ router.patch(
           name: true,
           username: true,
           role: true,
+          avatarUrl: true,
           isActive: true,
           createdAt: true,
         }
