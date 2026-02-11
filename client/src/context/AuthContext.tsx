@@ -19,6 +19,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  const resolvePersistedAvatar = () => {
+    const extras = localStorage.getItem('profileExtras');
+    if (!extras) return null;
+
+    try {
+      const parsed = JSON.parse(extras) as { avatarUrl?: string };
+      return typeof parsed.avatarUrl === 'string' && parsed.avatarUrl ? parsed.avatarUrl : null;
+    } catch {
+      return null;
+    }
+  };
+
   // Check for existing token on mount
   useEffect(() => {
     const savedToken = localStorage.getItem('token');
@@ -26,7 +38,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     
     if (savedToken && savedUser) {
       setToken(savedToken);
-      setUser(JSON.parse(savedUser));
+      const parsedUser = JSON.parse(savedUser) as User;
+      const avatarUrl = resolvePersistedAvatar();
+      setUser(avatarUrl ? { ...parsedUser, avatarUrl } : parsedUser);
     }
     setIsLoading(false);
   }, []);
@@ -38,12 +52,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
 
     const { token: newToken, user: newUser } = response.data;
+    const avatarUrl = resolvePersistedAvatar();
+    const hydratedUser = avatarUrl ? { ...newUser, avatarUrl } : newUser;
 
     // Save to state and localStorage
     setToken(newToken);
-    setUser(newUser);
+    setUser(hydratedUser);
     localStorage.setItem('token', newToken);
-    localStorage.setItem('user', JSON.stringify(newUser));
+    localStorage.setItem('user', JSON.stringify(hydratedUser));
   };
 
   const logout = () => {
