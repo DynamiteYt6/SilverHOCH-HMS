@@ -4,7 +4,7 @@ import path from "path";
 import prisma from "../lib/prisma.js";
 import { requireAuth } from "../middleware/auth.js";
 import { requireRole } from "../middleware/roles.js";
-import { UserRole, InventoryCategory } from "@prisma/client";
+import { UserRole } from "@prisma/client";
 import type { AuthRequest } from "../middleware/auth.js";
 
 const router = Router();
@@ -13,7 +13,7 @@ const uploadDir = path.join(process.cwd(), "uploads", "inventory");
 // ============================================
 // GET /api/inventory - Get all inventory items
 // ============================================
-router.get("/", requireAuth, async (req, res) => {
+router.get("/", requireAuth, requireRole(UserRole.SUPER_ADMIN, UserRole.ADMIN), async (req, res) => {
   try {
     const items = await prisma.inventoryItem.findMany({
       orderBy: { name: "asc" }
@@ -60,12 +60,7 @@ router.post(
 router.post(
   "/:id/image",
   requireAuth,
-  requireRole(
-    UserRole.SUPER_ADMIN,
-    UserRole.ADMIN,
-    UserRole.DRINKS_SELLER,
-    UserRole.FRONT_DESK
-  ),
+  requireRole(UserRole.SUPER_ADMIN, UserRole.ADMIN),
   async (req, res) => {
     try {
       const { imageData, fileName } = req.body;
@@ -126,6 +121,7 @@ router.post(
 router.post(
   "/sale",
   requireAuth,
+  requireRole(UserRole.SUPER_ADMIN, UserRole.ADMIN),
   async (req: AuthRequest, res) => {
     try {
       const { itemId, quantity, paymentMethod } = req.body;
@@ -155,23 +151,6 @@ router.post(
       if (item.quantity < quantity) {
         return res.status(400).json({ 
           message: `Insufficient stock. Available: ${item.quantity}` 
-        });
-      }
-
-      // Check role permissions
-      // DRINKS_SELLER can only sell drinks
-      // FRONT_DESK can only sell condoms
-      const userRole = req.user!.role;
-      
-      if (userRole === UserRole.DRINKS_SELLER && item.category !== InventoryCategory.DRINK) {
-        return res.status(403).json({ 
-          message: "Drinks sellers can only sell drinks" 
-        });
-      }
-
-      if (userRole === UserRole.FRONT_DESK && item.category !== InventoryCategory.CONDOM) {
-        return res.status(403).json({ 
-          message: "Front desk can only sell condoms" 
         });
       }
 
@@ -236,7 +215,7 @@ router.post(
 // ============================================
 // GET /api/inventory/sales - Get all sales
 // ============================================
-router.get("/sales", requireAuth, async (req, res) => {
+router.get("/sales", requireAuth, requireRole(UserRole.SUPER_ADMIN, UserRole.ADMIN), async (req, res) => {
   try {
     const sales = await prisma.sale.findMany({
       include: {
