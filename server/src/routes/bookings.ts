@@ -26,6 +26,10 @@ router.post(
         });
       }
 
+      const nights = stayType === StayType.OVERNIGHT
+        ? Math.min(30, Math.max(1, Number(numberOfNights) || 1))
+        : 1;
+
       // Check if room exists and is available
       const room = await prisma.room.findUnique({
         where: { id: roomId }
