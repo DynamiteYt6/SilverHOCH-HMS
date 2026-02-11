@@ -52,21 +52,21 @@ router.post(
       // Calculate price based on room type and stay type
       const settings = readAppSettings();
       const pricing = settings.pricing;
-      const priceForRoom = (roomType: "FAN" | "AC") => {
-        if (roomType === "FAN") {
-          return stayType === StayType.OVERNIGHT ? pricing.fanOvernightPrice * nights : pricing.fanShortStayPrice;
-        }
-        return stayType === StayType.OVERNIGHT ? pricing.acOvernightPrice * nights : pricing.acShortStayPrice;
-      };
+      let price: number;
+      if (room.type === "FAN") {
+        price = stayType === StayType.OVERNIGHT ? pricing.fanOvernightPrice : pricing.fanShortStayPrice;
+      } else {
+        // AC room
+        price = stayType === StayType.OVERNIGHT ? pricing.acOvernightPrice : pricing.acShortStayPrice;
+      }
 
-      const bookingMetadata = {
+      const guestPayload = {
         guestName: typeof guestName === "string" ? guestName.trim() : "",
         guestPhone: typeof guestPhone === "string" ? guestPhone.trim() : "",
         guestEmail: typeof guestEmail === "string" ? guestEmail.trim() : "",
         guestAddress: typeof guestAddress === "string" ? guestAddress.trim() : "",
-        numberOfNights: nights,
       };
-      const hasMetadata = Object.entries(bookingMetadata).some(([key, value]) => key === "numberOfNights" ? Number(value) > 1 : Boolean(value));
+      const hasGuestData = Object.values(guestPayload).some(Boolean);
 
       // Calculate times
       const checkIn = new Date();
@@ -100,44 +100,43 @@ router.post(
         });
       }
 
-      // Create bookings with payments in a transaction
-      const bookingIds = await prisma.$transaction(async (tx) => {
-        const createdBookingIds: string[] = [];
+      // Create booking with payment in a transaction
+      const booking = await prisma.$transaction(async (tx) => {
+        // Create the booking
+        const newBooking = await tx.booking.create({
+          data: {
+            roomId,
+            stayType,
+            source: BookingSource.WALK_IN,
+            checkIn,
+            checkOut,
+            shortStayEnd,
+            price,
+            createdById: req.user!.id,
+            businessDayId: businessDay.id,
+            note: hasGuestData ? JSON.stringify(guestPayload) : null,
+          },
+          include: {
+            room: true,
+            payment: true,
+          }
+        });
 
-        for (const room of rooms) {
-          const roomPrice = priceForRoom(room.type);
+        // Create payment record
+        await tx.payment.create({
+          data: {
+            bookingId: newBooking.id,
+            amount: price,
+            method: paymentMethod,
+            status: PaymentStatus.PENDING,
+          }
+        });
 
-          const newBooking = await tx.booking.create({
-            data: {
-              roomId: room.id,
-              stayType,
-              source: BookingSource.WALK_IN,
-              checkIn,
-              checkOut,
-              shortStayEnd,
-              price: roomPrice,
-              createdById: req.user!.id,
-              businessDayId: businessDay.id,
-              note: hasMetadata ? JSON.stringify(bookingMetadata) : null,
-            },
-          });
-
-          await tx.payment.create({
-            data: {
-              bookingId: newBooking.id,
-              amount: roomPrice,
-              method: paymentMethod,
-              status: PaymentStatus.PENDING,
-            }
-          });
-
-          await tx.room.update({
-            where: { id: room.id },
-            data: { status: RoomStatus.OCCUPIED }
-          });
-
-          createdBookingIds.push(newBooking.id);
-        }
+        // Update room status to OCCUPIED
+        await tx.room.update({
+          where: { id: roomId },
+          data: { status: RoomStatus.OCCUPIED }
+        });
 
         return createdBookingIds;
       });

@@ -614,12 +614,21 @@ export default function SettingsPage() {
               </div>
             </form>
           </div>
+<<<<<<< codex/add-selectable-images-for-stock-items-ybvt7v
           </div>
         )}
 
         {/* System Tab */}
         {activeTab === 'system' && (
           <div className="max-w-3xl mx-auto space-y-6">
+=======
+        </div>
+      )}
+
+      {/* System Tab */}
+      {activeTab === 'system' && (
+        <div className="max-w-3xl space-y-6">
+>>>>>>> main
           {/* Backup & Restore */}
           <div className="bg-white dark:bg-[#1a2130] rounded-xl border border-gray-200 dark:border-gray-800 p-6">
             <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Backup & Restore</h2>
