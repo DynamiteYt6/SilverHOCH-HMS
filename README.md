@@ -1,10 +1,10 @@
 # Silver HOCH Hotel Management System (HMS)
 
-A comprehensive backend API for a hotel management system designed for small hotels to manage daily operations including room bookings, short stays, inventory sales, payments, and end-of-day reconciliation.
+A comprehensive full-stack hotel management system designed for small hotels to manage daily operations including room bookings, short stays, inventory sales, payments, and end-of-day reconciliation.
 
 ## Overview
 
-Silver HOCH HMS is an internal hotel management system built for a 20-room hotel. The system streamlines operations for front desk staff, drinks sellers, and administrators with role-based access control and real-time room management. This repository contains the backend API implementation.
+Silver HOCH HMS is an internal hotel management system built for a 20-room hotel. The system streamlines operations for front desk staff, drinks sellers, and administrators with role-based access control and real-time room management. This repository contains both the backend API and the React-based frontend application.
 
 ## Features
 
@@ -13,12 +13,14 @@ Silver HOCH HMS is an internal hotel management system built for a 20-room hotel
 - Real-time room status tracking (Available, Occupied, Cleaning, Reserved)
 - Visual layout matching physical hotel structure
 - Support for Fan and AC room types
+- Color-coded status indicators in the UI
 
 ### Booking System
 - **Overnight Bookings**: Standard hotel stays with automatic pricing
 - **Short Stay Bookings**: 90-minute timer-based stays with overstay detection
 - Automated alerts for expiring short stays
 - Prevent unauthorized booking deletions
+- Visual countdown timers for short stays
 
 ### Pricing
 - **Fan Rooms**: ₦10,000 (overnight), ₦4,000 (short stay)
@@ -34,12 +36,23 @@ Silver HOCH HMS is an internal hotel management system built for a 20-room hotel
 - Track drinks and condom inventory
 - Role-based sales permissions
 - Automatic quantity reduction on sale
+- Real-time stock tracking
 
 ### Reporting & Reconciliation
 - End-of-day summary reports
 - Room revenue and payment breakdowns
 - Excel export functionality
 - Admin-only day locking for read-only historical data
+- Interactive dashboard with charts and statistics
+
+### Frontend Features
+- Modern React-based user interface
+- Dark/Light theme support with context-based state management
+- Responsive design for desktop and tablet use
+- Real-time data updates
+- Role-based UI elements and permissions
+- Protected routes with authentication
+- Visual dashboards with key metrics at a glance
 
 ## Implemented Features
 
@@ -48,12 +61,14 @@ Silver HOCH HMS is an internal hotel management system built for a 20-room hotel
 - ✅ Role-based access control (4 roles)
 - ✅ Password hashing with bcrypt
 - ✅ Protected routes with middleware
+- ✅ Secure session management
 
 🏨 **Room Management**
 - ✅ View all rooms (sorted by floor/number)
 - ✅ View single room details
 - ✅ Update room status
 - ✅ Automatic status transitions (AVAILABLE → OCCUPIED → CLEANING)
+- ✅ Visual room status cards with color coding
 
 📅 **Booking System**
 - ✅ Create bookings (overnight & short stay)
@@ -61,6 +76,7 @@ Silver HOCH HMS is an internal hotel management system built for a 20-room hotel
 - ✅ Checkout functionality
 - ✅ Business rules validation
 - ✅ Database transactions for data integrity
+- ✅ Short stay timer with visual countdown
 
 💰 **Payment Management**
 - ✅ Payment records linked to bookings
@@ -108,6 +124,16 @@ Silver HOCH HMS is an internal hotel management system built for a 20-room hotel
 - **tsx** - TypeScript execution for development
 - **dotenv** - Environment variable management
 
+### Frontend
+- **React 18** - UI library
+- **TypeScript** - Type-safe JavaScript
+- **Vite** - Build tool and development server
+- **Tailwind CSS** - Utility-first CSS framework
+- **React Router DOM** - Client-side routing
+- **Axios** - HTTP client for API requests
+- **Context API** - Global state management (Auth, Theme)
+- **ESLint** - Code linting
+
 ### Development Tools
 - **nodemon** - Development server with hot reload
 - **Prisma Studio** - Database GUI
@@ -129,7 +155,7 @@ Silver HOCH HMS is an internal hotel management system built for a 20-room hotel
 - PostgreSQL (v13 or higher)
 - npm (comes with Node.js)
 
-### Setup
+### Backend Setup (Server)
 
 1. **Clone the repository**
 ```bash
@@ -175,37 +201,96 @@ npm run dev
 
 The API will be available at `http://localhost:3000`
 
+### Frontend Setup (Client)
+
+1. **Navigate to the client directory**
+```bash
+cd ../client
+```
+
+2. **Install dependencies**
+```bash
+npm install
+```
+
+3. **Start the development server**
+```bash
+npm run dev
+```
+
+The frontend will be available at `http://localhost:5173` (default Vite port)
+
+4. **Build for production**
+```bash
+npm run build
+```
+
+The production build will be in the `dist` directory.
+
 ## Project Structure
 
 ```
 SilverHOCH-HMS/
-├── server/
+├── client/                      # React frontend application
+│   ├── src/
+│   │   ├── components/          # Reusable UI components
+│   │   │   └── Layout.tsx       # Main layout component
+│   │   ├── context/             # React Context for state management
+│   │   │   ├── AuthContext.tsx # Authentication state
+│   │   │   └── ThemeContext.tsx # Theme (dark/light) state
+│   │   ├── pages/               # Page components
+│   │   │   ├── BookingsPage.tsx
+│   │   │   ├── DashboardPage.tsx
+│   │   │   ├── InventoryPage.tsx
+│   │   │   ├── Login.tsx
+│   │   │   ├── ReportsPage.tsx
+│   │   │   ├── RoomsPage.tsx
+│   │   │   ├── SettingsPage.tsx
+│   │   │   └── UsersPage.tsx
+│   │   ├── services/            # API service layer
+│   │   │   └── api.ts           # Axios API client
+│   │   ├── types/               # TypeScript type definitions
+│   │   │   └── index.ts
+│   │   ├── App.tsx              # Main app component
+│   │   ├── main.tsx             # Entry point
+│   │   └── index.css            # Global styles
+│   ├── index.html
+│   ├── package.json
+│   ├── tailwind.config.js
+│   ├── tsconfig.json
+│   └── vite.config.ts
+├── server/                       # Express backend API
 │   ├── prisma/
-│   │   ├── schema.prisma       # Database schema with all models
-│   │   ├── seed.ts             # Database seeding script
-│   │   └── migrations/         # Database migration history
+│   │   ├── schema.prisma        # Database schema with all models
+│   │   ├── seed.ts              # Database seeding script
+│   │   └── migrations/          # Database migration history
 │   ├── src/
 │   │   ├── lib/
-│   │   │   ├── hash.ts         # Password hashing utilities (bcrypt)
-│   │   │   ├── jwt.ts          # JWT token generation & verification
-│   │   │   └── prisma.ts       # Prisma client instance
+│   │   │   ├── hash.ts          # Password hashing utilities (bcrypt)
+│   │   │   ├── jwt.ts           # JWT token generation & verification
+│   │   │   └── prisma.ts        # Prisma client instance
 │   │   ├── middleware/
-│   │   │   ├── auth.ts         # JWT authentication middleware
-│   │   │   ├── middleware.ts   # Additional middleware utilities
-│   │   │   └── roles.ts        # Role-based access control middleware
+│   │   │   ├── auth.ts          # JWT authentication middleware
+│   │   │   ├── middleware.ts    # Additional middleware utilities
+│   │   │   └── roles.ts         # Role-based access control middleware
 │   │   ├── routes/
-│   │   │   ├── auth.ts         # Authentication routes (login)
-│   │   │   ├── bookings.ts     # Booking management endpoints
-│   │   │   ├── inventory.ts    # Inventory and sales management
-│   │   │   ├── payment.ts      # Payment processing endpoints
-│   │   │   ├── reports.ts      # Reporting and analytics
-│   │   │   ├── rooms.ts        # Room management endpoints
-│   │   │   └── users.ts        # User management endpoints
-│   │   ├── app.ts              # Express app configuration
-│   │   └── server.ts           # Server entry point
-│   ├── .env                    # Environment variables (not in repo)
-│   ├── package.json            # Dependencies and scripts
-│   ├── tsconfig.json           # TypeScript configuration
+│   │   │   ├── auth.ts          # Authentication routes (login)
+│   │   │   ├── bookings.ts      # Booking management endpoints
+│   │   │   ├── inventory.ts     # Inventory and sales management
+│   │   │   ├── payment.ts       # Payment processing endpoints
+│   │   │   ├── reports.ts       # Reporting and analytics
+│   │   │   ├── rooms.ts         # Room management endpoints
+│   │   │   ├── settings.ts      # Settings management endpoints
+│   │   │   └── users.ts         # User management endpoints
+│   │   ├── app.ts               # Express app configuration
+│   │   └── server.ts            # Server entry point
+│   ├── data/
+│   │   └── app-settings.json    # Application settings
+│   ├── uploads/                 # Uploaded files directory
+│   │   └── inventory/          # Inventory item images
+│   ├── .env                     # Environment variables (not in repo)
+│   ├── package.json             # Dependencies and scripts
+│   ├── tsconfig.json            # TypeScript configuration
 │   └── .gitignore
 └── README.md
 ```
@@ -331,6 +416,15 @@ Authorization: Bearer <your_jwt_token>
   - **Body**: `{ "date": "YYYY-MM-DD" }`
   - **Response**: Confirmation of locked day
 
+### Settings
+- `GET /api/settings` - Get application settings
+  - **Auth**: Required (SUPER_ADMIN, ADMIN)
+  - **Response**: Settings object
+- `PATCH /api/settings` - Update application settings
+  - **Auth**: Required (SUPER_ADMIN)
+  - **Body**: `{ "key": "value", ... }`
+  - **Response**: Updated settings object
+
 ## Database Schema
 
 ### Core Models
@@ -353,7 +447,7 @@ Authorization: Bearer <your_jwt_token>
 - Status: PAID, PENDING
 
 **InventoryItem**
-- id, name, category (DRINK/CONDOM), quantity, price
+- id, name, category (DRINK/CONDOM), quantity, price, imageUrl
 
 **Sale**
 - id, itemId, quantity, totalPrice, soldById
@@ -366,6 +460,8 @@ Authorization: Bearer <your_jwt_token>
 ## Development
 
 ### Available Scripts
+
+**Server (Backend)**
 ```bash
 # Development server with hot reload (using tsx)
 npm run dev
@@ -375,6 +471,21 @@ npm run build
 
 # Start production server
 npm start
+```
+
+**Client (Frontend)**
+```bash
+# Development server with hot reload (using Vite)
+npm run dev
+
+# Build for production
+npm run build
+
+# Preview production build
+npm run preview
+
+# Lint code
+npm run lint
 ```
 
 ### Database Operations
@@ -417,6 +528,7 @@ npx tsx prisma/seed.ts
 - ✅ Environment variable configuration
 - ✅ Secure token verification middleware
 - ✅ Protected routes requiring authentication
+- ✅ Frontend route protection based on user roles
 
 ## Deployment
 
@@ -424,19 +536,31 @@ npx tsx prisma/seed.ts
 - PostgreSQL database instance
 - Node.js hosting service (Railway, Render, Heroku, AWS, etc.)
 
-### Steps
+### Backend Deployment
 1. Set production environment variables on your hosting platform
 2. Build the application: `npm run build`
 3. Configure PostgreSQL production database connection
 4. Run database migrations: `npx prisma migrate deploy`
 5. Start the server: `npm start`
 
+### Frontend Deployment
+1. Build the client: `npm run build`
+2. Deploy the `dist` folder to a static hosting service (Vercel, Netlify, etc.)
+3. Configure the API base URL in the frontend environment
+
 ### Environment Variables for Production
+
+**Server (.env)**
 ```env
 DATABASE_URL=postgresql://user:password@host:5432/database
 JWT_SECRET=your_secure_random_secret
 PORT=3000
 NODE_ENV=production
+```
+
+**Client (.env)**
+```env
+VITE_API_URL=http://localhost:3000
 ```
 
 ## Current Status
@@ -459,9 +583,15 @@ NODE_ENV=production
 - [x] Payment processing endpoints
 - [x] Report generation endpoints
 - [x] User management endpoints
-
-### 🚧 In Progress
-- [ ] Frontend application
+- [x] Settings management endpoints
+- [x] React frontend application
+- [x] Theme switching (dark/light mode)
+- [x] Responsive dashboard design
+- [x] Room management UI
+- [x] Booking management UI
+- [x] Inventory management UI
+- [x] User management UI
+- [x] Reports and analytics UI
 
 ### 📋 Planned
 - [ ] Online booking support
@@ -469,14 +599,30 @@ NODE_ENV=production
 - [ ] Multi-hotel management
 - [ ] Advanced analytics and forecasting
 - [ ] Mobile application
-- [ ] Real-time notifications
+- [ ] Real-time notifications (WebSocket)
 - [ ] Automated backup system
+- [ ] SMS/Email notifications
+- [ ] Room maintenance scheduling
+- [ ] Guest profile management
+
+## Frontend Pages Overview
+
+| Page | Route | Description | Required Role |
+|------|-------|-------------|--------------|
+| Login | `/login` | User authentication page | All |
+| Dashboard | `/dashboard` | Overview with key metrics and statistics | All authenticated |
+| Rooms | `/rooms` | Room management with status visualization | FRONT_DESK+ |
+| Bookings | `/bookings` | Booking management and creation | FRONT_DESK+ |
+| Inventory | `/inventory` | Inventory items and sales | All (role-based) |
+| Users | `/users` | User management | ADMIN+ |
+| Reports | `/reports` | Daily reports and analytics | ADMIN+ |
+| Settings | `/settings` | Application settings | ADMIN+ |
 
 ## Troubleshooting
 
 ### Common Issues
 
-**Module not found errors**
+**Module not found errors (Backend)**
 - Make sure to use `.js` extensions in imports (TypeScript with ES modules requirement)
 - Run `npx prisma generate` after schema changes
 
@@ -493,6 +639,15 @@ NODE_ENV=production
 - Stop the development server before running Prisma commands
 - Close Prisma Studio if open
 
+**Frontend build errors**
+- Ensure Node.js version is 16 or higher
+- Delete `node_modules` and run `npm install` again
+- Check TypeScript compilation errors
+
+**CORS errors**
+- Ensure frontend is configured to point to correct API URL
+- Check CORS configuration in backend `app.ts`
+
 ## Contributing
 
 1. Fork the repository
@@ -507,7 +662,8 @@ This project is proprietary software developed for Silver HOCH Hotel.
 
 ---
 
-**Version**: 1.0
-**Status**: Backend Complete - Frontend In Progress
-**Last Updated**: January 29, 2024
+**Version**: 2.0
+**Status**: Full-Stack Application Complete
+**Last Updated**: February 2025
 **Author**: DynamiteYt6
+
