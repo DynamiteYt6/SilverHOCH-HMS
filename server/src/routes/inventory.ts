@@ -1,14 +1,12 @@
 import { Router } from "express";
-import fs from "fs";
-import path from "path";
 import prisma from "../lib/prisma.js";
 import { requireAuth } from "../middleware/auth.js";
 import { requireRole } from "../middleware/roles.js";
 import { UserRole } from "@prisma/client";
 import type { AuthRequest } from "../middleware/auth.js";
+import { uploadToCloudinary, deleteFromCloudinary } from "../lib/cloudinary.js";
 
 const router = Router();
-const uploadDir = path.join(process.cwd(), "uploads", "inventory");
 
 function getAllowedSaleCategory(role: string): "DRINK" | "CONDOM" | null {
   if (role === UserRole.DRINKS_SELLER) return "DRINK";
@@ -71,6 +69,13 @@ router.delete("/:id", requireAuth, requireRole(UserRole.SUPER_ADMIN, UserRole.AD
   try {
     const id = typeof req.params.id === "string" ? req.params.id : undefined;
     if (!id) return res.status(400).json({ message: "Invalid item ID" });
+
+    // Clean up Cloudinary image if exists
+    const item = await prisma.inventoryItem.findUnique({ where: { id } });
+    if (item?.imageUrl) {
+      await deleteFromCloudinary(item.imageUrl);
+    }
+
     await prisma.inventoryItem.delete({ where: { id } });
     res.json({ message: "Item deleted successfully" });
   } catch (error) {
@@ -79,42 +84,38 @@ router.delete("/:id", requireAuth, requireRole(UserRole.SUPER_ADMIN, UserRole.AD
   }
 });
 
-// POST /api/inventory/:id/image
+// POST /api/inventory/:id/image — now uploads to Cloudinary
 router.post("/:id/image", requireAuth, requireRole(UserRole.SUPER_ADMIN, UserRole.ADMIN), async (req: AuthRequest, res) => {
   try {
     const id = typeof req.params.id === "string" ? req.params.id : undefined;
     if (!id) return res.status(400).json({ message: "Invalid item ID" });
 
-    const { imageData, fileName } = req.body;
+    const { imageData } = req.body;
     if (!imageData || typeof imageData !== "string") {
       return res.status(400).json({ message: "Image data is required" });
     }
-    const matches = imageData.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/);
-    if (!matches) {
+
+    // Validate it's a proper base64 image
+    if (!imageData.match(/^data:image\/[a-zA-Z0-9.+-]+;base64,/)) {
       return res.status(400).json({ message: "Invalid image data format" });
     }
+
     const item = await prisma.inventoryItem.findUnique({ where: { id } });
     if (!item) return res.status(404).json({ message: "Item not found" });
 
-    const mimeType = matches[1] as string;
-    const base64Data = matches[2] as string;
-    const extensionFromMime = mimeType.split("/")[1] ?? "jpg";
-    const providedExtension = typeof fileName === "string" && fileName.length > 0 ? path.extname(fileName) : "";
-    const safeExtension = (providedExtension || `.${extensionFromMime}`).replace(/[^a-zA-Z0-9.]/g, "").toLowerCase();
-    const safeName = `${Date.now()}-${Math.round(Math.random() * 1e9)}${safeExtension}`;
-    const imageBuffer = Buffer.from(base64Data, "base64");
-
-    if (imageBuffer.length > 5 * 1024 * 1024) {
-      return res.status(400).json({ message: "Image must be 5MB or smaller" });
+    // Delete old Cloudinary image if replacing
+    if (item.imageUrl && item.imageUrl.includes("cloudinary.com")) {
+      await deleteFromCloudinary(item.imageUrl);
     }
 
-    fs.mkdirSync(uploadDir, { recursive: true });
-    fs.writeFileSync(path.join(uploadDir, safeName), imageBuffer);
+    // Upload to Cloudinary — returns a permanent URL
+    const imageUrl = await uploadToCloudinary(imageData);
 
     const updatedItem = await prisma.inventoryItem.update({
       where: { id },
-      data: { imageUrl: `/uploads/inventory/${safeName}` },
+      data: { imageUrl },
     });
+
     res.status(200).json(updatedItem);
   } catch (error) {
     console.error(error);
