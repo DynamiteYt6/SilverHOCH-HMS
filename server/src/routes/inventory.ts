@@ -52,9 +52,11 @@ router.post("/", requireAuth, requireRole(UserRole.SUPER_ADMIN, UserRole.ADMIN),
 // PUT /api/inventory/:id
 router.put("/:id", requireAuth, requireRole(UserRole.SUPER_ADMIN, UserRole.ADMIN), async (req, res) => {
   try {
+    const id = typeof req.params.id === "string" ? req.params.id : undefined;
+    if (!id) return res.status(400).json({ message: "Invalid item ID" });
     const { name, category, quantity, price } = req.body;
     const item = await prisma.inventoryItem.update({
-      where: { id: req.params.id },
+      where: { id },
       data: { name, category, quantity, price },
     });
     res.json(item);
@@ -67,7 +69,9 @@ router.put("/:id", requireAuth, requireRole(UserRole.SUPER_ADMIN, UserRole.ADMIN
 // DELETE /api/inventory/:id
 router.delete("/:id", requireAuth, requireRole(UserRole.SUPER_ADMIN, UserRole.ADMIN), async (req, res) => {
   try {
-    await prisma.inventoryItem.delete({ where: { id: req.params.id } });
+    const id = typeof req.params.id === "string" ? req.params.id : undefined;
+    if (!id) return res.status(400).json({ message: "Invalid item ID" });
+    await prisma.inventoryItem.delete({ where: { id } });
     res.json({ message: "Item deleted successfully" });
   } catch (error) {
     console.error(error);
@@ -78,6 +82,9 @@ router.delete("/:id", requireAuth, requireRole(UserRole.SUPER_ADMIN, UserRole.AD
 // POST /api/inventory/:id/image
 router.post("/:id/image", requireAuth, requireRole(UserRole.SUPER_ADMIN, UserRole.ADMIN), async (req: AuthRequest, res) => {
   try {
+    const id = typeof req.params.id === "string" ? req.params.id : undefined;
+    if (!id) return res.status(400).json({ message: "Invalid item ID" });
+
     const { imageData, fileName } = req.body;
     if (!imageData || typeof imageData !== "string") {
       return res.status(400).json({ message: "Image data is required" });
@@ -86,7 +93,7 @@ router.post("/:id/image", requireAuth, requireRole(UserRole.SUPER_ADMIN, UserRol
     if (!matches) {
       return res.status(400).json({ message: "Invalid image data format" });
     }
-    const item = await prisma.inventoryItem.findUnique({ where: { id: req.params.id } });
+    const item = await prisma.inventoryItem.findUnique({ where: { id } });
     if (!item) return res.status(404).json({ message: "Item not found" });
 
     const mimeType = matches[1] as string;
@@ -105,7 +112,7 @@ router.post("/:id/image", requireAuth, requireRole(UserRole.SUPER_ADMIN, UserRol
     fs.writeFileSync(path.join(uploadDir, safeName), imageBuffer);
 
     const updatedItem = await prisma.inventoryItem.update({
-      where: { id: req.params.id },
+      where: { id },
       data: { imageUrl: `/uploads/inventory/${safeName}` },
     });
     res.status(200).json(updatedItem);
