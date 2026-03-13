@@ -76,6 +76,11 @@ function App() {
                 </ProtectedRoute>
               }
             />
+            {/*
+              /settings is open to ALL roles.
+              Hotel and System tabs hide themselves for non-admins
+              inside SettingsPage — only the Profile tab shows.
+            */}
             <Route
               path="/settings"
               element={
