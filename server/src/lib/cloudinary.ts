@@ -1,11 +1,9 @@
 import { v2 as cloudinary } from "cloudinary";
 
-// Configured automatically from environment variables:
-// CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET
 cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME ?? "",
+  api_key: process.env.CLOUDINARY_API_KEY ?? "",
+  api_secret: process.env.CLOUDINARY_API_SECRET ?? "",
 });
 
 /**
@@ -34,18 +32,15 @@ export async function uploadToCloudinary(
  */
 export async function deleteFromCloudinary(imageUrl: string): Promise<void> {
   try {
-    // Extract public_id from the URL
-    // e.g. https://res.cloudinary.com/name/image/upload/v123/silverhoch/inventory/abc.jpg
     const parts = imageUrl.split("/");
     const uploadIndex = parts.indexOf("upload");
     if (uploadIndex === -1) return;
 
-    // public_id is everything after upload/vXXXX/
     const afterUpload = parts.slice(uploadIndex + 2).join("/");
-    const publicId = afterUpload.replace(/\.[^/.]+$/, ""); // remove extension
+    const publicId = afterUpload.replace(/\.[^/.]+$/, "");
 
     await cloudinary.uploader.destroy(publicId);
   } catch {
-    // Non-fatal — image may already be gone
+    // Non-fatal
   }
 }
