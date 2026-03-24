@@ -26,6 +26,10 @@ export default function InventoryPage() {
   const [isAddItemOpen, setIsAddItemOpen] = useState(false);
   const [isAddingItem, setIsAddingItem] = useState(false);
   const [addItemError, setAddItemError] = useState<string | null>(null);
+  const [restockItem, setRestockItem] = useState<InventoryItem | null>(null);
+  const [restockQuantity, setRestockQuantity] = useState('');
+  const [isRestocking, setIsRestocking] = useState(false);
+  const [restockError, setRestockError] = useState<string | null>(null);
   const [newItem, setNewItem] = useState({
     name: '',
     category: 'DRINK' as 'DRINK' | 'CONDOM',
@@ -166,6 +170,41 @@ export default function InventoryPage() {
       setAddItemError(err.response?.data?.message || 'Failed to add inventory item.');
     } finally {
       setIsAddingItem(false);
+    }
+  };
+
+  const handleRestockItem = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!restockItem) return;
+
+    const addQty = Number(restockQuantity);
+    if (!Number.isInteger(addQty) || addQty <= 0) {
+      setRestockError('Enter a valid quantity greater than 0.');
+      return;
+    }
+
+    try {
+      setIsRestocking(true);
+      setRestockError(null);
+
+      const response = await api.put<InventoryItem>(`/api/inventory/${restockItem.id}`, {
+        name: restockItem.name,
+        category: restockItem.category,
+        price: restockItem.price,
+        quantity: restockItem.quantity + addQty,
+      });
+
+      const updatedItem = response.data;
+      setInventory((prev) => prev.map((item) => (item.id === updatedItem.id ? updatedItem : item)));
+      setCart((prev) =>
+        prev.map((ci) => (ci.item.id === updatedItem.id ? { ...ci, item: updatedItem } : ci))
+      );
+      setRestockItem(null);
+      setRestockQuantity('');
+    } catch (err: any) {
+      setRestockError(err.response?.data?.message || 'Failed to restock item.');
+    } finally {
+      setIsRestocking(false);
     }
   };
 
@@ -327,7 +366,7 @@ export default function InventoryPage() {
       )}
 
       {/* Header */}
-      <div className="flex justify-between items-center mb-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center mb-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Inventory & Sales</h1>
           <p className="text-gray-500 dark:text-gray-400 text-sm">Manage stock and process sales</p>
@@ -354,9 +393,9 @@ export default function InventoryPage() {
 
       {/* Sale Interface */}
       <div className="mb-6 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-[#1a2130] overflow-hidden">
-        <div className="grid grid-cols-12 gap-0">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-0">
           {/* Items Selection */}
-          <div className="col-span-8 p-4 border-r border-gray-200 dark:border-gray-800">
+          <div className="lg:col-span-8 p-4 lg:border-r border-b lg:border-b-0 border-gray-200 dark:border-gray-800">
             <div className="relative mb-4">
               <svg className="absolute left-3 top-3 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -370,7 +409,7 @@ export default function InventoryPage() {
               />
             </div>
             
-            <div className="grid grid-cols-4 gap-3 max-h-[400px] overflow-y-auto custom-scrollbar pr-2">
+            <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3 max-h-[400px] overflow-y-auto custom-scrollbar pr-2">
               {filteredItems.map((item) => (
                 <button
                   key={item.id}
@@ -393,21 +432,36 @@ export default function InventoryPage() {
                     className="mt-2 flex justify-center"
                     onClick={(event) => event.stopPropagation()}
                   >
-                    <label className="cursor-pointer text-[10px] font-semibold text-blue-600 hover:text-blue-700">
-                      <input
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        onChange={(event) => {
-                          event.stopPropagation();
-                          const file = event.target.files?.[0];
-                          handleImageUpload(item.id, file);
-                          event.currentTarget.value = '';
-                        }}
-                        disabled={uploadingItemId === item.id}
-                      />
-                      {uploadingItemId === item.id ? 'Uploading...' : 'Upload image'}
-                    </label>
+                    <div className="flex flex-wrap justify-center gap-2">
+                      <label className="cursor-pointer text-[10px] font-semibold text-blue-600 hover:text-blue-700">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(event) => {
+                            event.stopPropagation();
+                            const file = event.target.files?.[0];
+                            handleImageUpload(item.id, file);
+                            event.currentTarget.value = '';
+                          }}
+                          disabled={uploadingItemId === item.id}
+                        />
+                        {uploadingItemId === item.id ? 'Uploading...' : 'Upload image'}
+                      </label>
+                      {canAddInventory && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setRestockItem(item);
+                            setRestockQuantity('');
+                            setRestockError(null);
+                          }}
+                          className="text-[10px] font-semibold text-emerald-600 hover:text-emerald-700"
+                        >
+                          Stock up
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </button>
               ))}
@@ -415,7 +469,7 @@ export default function InventoryPage() {
           </div>
 
           {/* Cart & Checkout */}
-          <div className="col-span-4 p-4 flex flex-col">
+          <div className="lg:col-span-4 p-4 flex flex-col">
             <h3 className="text-sm font-bold text-gray-500 dark:text-gray-400 mb-3">Cart ({cart.length})</h3>
             
             <div className="flex-1 space-y-2 max-h-[240px] overflow-y-auto custom-scrollbar pr-2 mb-4">
@@ -563,6 +617,60 @@ export default function InventoryPage() {
                 <button type="button" onClick={() => setIsAddItemOpen(false)} className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300">Cancel</button>
                 <button type="submit" disabled={isAddingItem} className="px-4 py-2 rounded-lg bg-blue-600 text-white font-semibold disabled:opacity-50">
                   {isAddingItem ? 'Adding...' : 'Add Item'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {restockItem && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+          <div className="w-full max-w-sm bg-white dark:bg-[#1a2130] rounded-xl border border-gray-200 dark:border-gray-800 p-6">
+            <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-1">Stock up inventory</h2>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+              Add more units to <span className="font-semibold text-gray-900 dark:text-white">{restockItem.name}</span>.
+            </p>
+            {restockError && <p className="mb-3 text-sm text-red-600 dark:text-red-400">{restockError}</p>}
+            <form onSubmit={handleRestockItem} className="space-y-4">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">Current quantity</label>
+                <input
+                  type="text"
+                  value={String(restockItem.quantity)}
+                  className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-gray-100 dark:bg-gray-800 px-3 py-2 text-gray-600 dark:text-gray-300"
+                  readOnly
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">Add quantity</label>
+                <input
+                  type="number"
+                  min={1}
+                  value={restockQuantity}
+                  onChange={(e) => setRestockQuantity(e.target.value)}
+                  className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-gray-900 dark:text-white"
+                  required
+                />
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRestockItem(null);
+                    setRestockQuantity('');
+                    setRestockError(null);
+                  }}
+                  className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isRestocking}
+                  className="px-4 py-2 rounded-lg bg-emerald-600 text-white font-semibold disabled:opacity-50"
+                >
+                  {isRestocking ? 'Updating...' : 'Update Stock'}
                 </button>
               </div>
             </form>

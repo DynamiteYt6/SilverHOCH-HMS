@@ -351,9 +351,9 @@ export default function Layout({ children }: LayoutProps) {
 
       <div className="p-2 border-t border-gray-200 dark:border-gray-800 space-y-0.5">
         <Link
-          to="/profile"
+          to="/settings?tab=profile"
           className={`flex items-center gap-2.5 px-2 py-2 rounded-lg transition-colors ${
-            isActive('/profile')
+            location.pathname === '/settings'
               ? 'bg-blue-600/10 text-blue-600 dark:text-blue-400'
               : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
           } ${!mobile && isCollapsed ? 'justify-center' : ''}`}
@@ -382,11 +382,11 @@ export default function Layout({ children }: LayoutProps) {
   );
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-[#0d1117]">
+    <div className="min-h-screen bg-gray-50 dark:bg-[#0d1117] md:flex">
       <aside
         className={`hidden md:flex ${
           isCollapsed ? 'w-16' : 'w-52'
-        } border-r border-gray-200 dark:border-gray-800 flex-col h-screen bg-white dark:bg-[#101622] transition-all duration-300 ease-in-out fixed left-0 top-0 z-40`}
+        } border-r border-gray-200 dark:border-gray-800 flex-col h-screen bg-white dark:bg-[#101622] transition-all duration-300 ease-in-out sticky top-0 shrink-0`}
       >
         <button
           onClick={() => setIsCollapsed((v) => !v)}
@@ -408,7 +408,7 @@ export default function Layout({ children }: LayoutProps) {
         </div>
       )}
 
-      <div className={`md:${isCollapsed ? 'ml-16' : 'ml-52'} transition-all duration-300 ease-in-out flex flex-col min-h-screen`}>
+      <div className="flex-1 transition-all duration-300 ease-in-out flex flex-col min-h-screen min-w-0">
         <header className="sticky top-0 z-30 bg-white/80 dark:bg-[#101622]/80 backdrop-blur-md border-b border-gray-200 dark:border-gray-800 px-4 h-14 flex items-center justify-between gap-2">
           <div className="flex items-center gap-3">
             <button
@@ -489,7 +489,7 @@ export default function Layout({ children }: LayoutProps) {
                   </div>
                   <button
                     onClick={() => {
-                      navigate('/profile');
+                      navigate('/settings?tab=profile');
                       setProfileOpen(false);
                     }}
                     className="w-full flex items-center gap-2.5 text-left px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg transition-colors"
