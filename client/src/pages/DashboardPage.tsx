@@ -193,9 +193,9 @@ export default function DashboardPage() {
       </div>
 
       {/* Room Status Section */}
-      <div className="flex items-center justify-between mb-2">
-        <h2 className="text-xl font-bold text-gray-900 dark:text-white">Real-time Room Status</h2>
-        <div className="flex gap-2">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-2">
+        <h2 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white">Real-time Room Status</h2>
+        <div className="flex flex-wrap gap-2">
           <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-500/10 rounded-full">
             <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
             <span className="text-xs font-bold text-emerald-600 dark:text-emerald-500 uppercase">Available</span>
@@ -216,8 +216,8 @@ export default function DashboardPage() {
       </div>
 
       {/* Floor Tabs */}
-      <div className="border-b border-gray-200 dark:border-gray-800 mb-6">
-        <div className="flex gap-8">
+      <div className="border-b border-gray-200 dark:border-gray-800 mb-6 overflow-x-auto">
+        <div className="flex gap-6 min-w-max">
           <button
             onClick={() => setSelectedFloor(1)}
             className={`py-4 border-b-2 transition-colors ${
