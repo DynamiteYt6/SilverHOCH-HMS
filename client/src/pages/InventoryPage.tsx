@@ -37,6 +37,7 @@ export default function InventoryPage() {
   const [restockError, setRestockError] = useState<string | null>(null);
   const [isDuplicatesOpen, setIsDuplicatesOpen] = useState(false);
   const [deletingDuplicateId, setDeletingDuplicateId] = useState<string | null>(null);
+  const [deletingItemId, setDeletingItemId] = useState<string | null>(null);
   const [duplicateActionError, setDuplicateActionError] = useState<string | null>(null);
   const [newItem, setNewItem] = useState({
     name: '',
@@ -344,6 +345,25 @@ export default function InventoryPage() {
     }
   };
 
+  const handleDeleteInventoryItem = async (item: InventoryItem) => {
+    const shouldDelete = window.confirm(
+      `Delete "${item.name}" permanently? This cannot be undone.`
+    );
+    if (!shouldDelete) return;
+
+    try {
+      setDeletingItemId(item.id);
+      setError(null);
+      await api.delete(`/api/inventory/${item.id}`);
+      setInventory((prev) => prev.filter((inv) => inv.id !== item.id));
+      setCart((prev) => prev.filter((ci) => ci.item.id !== item.id));
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Failed to delete inventory item.');
+    } finally {
+      setDeletingItemId(null);
+    }
+  };
+
   if (isLoading) {
     return (
       <Layout>
@@ -496,17 +516,27 @@ export default function InventoryPage() {
                         {uploadingItemId === item.id ? 'Uploading...' : 'Upload image'}
                       </label>
                       {canAddInventory && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setRestockItem(item);
-                            setRestockQuantity('');
-                            setRestockError(null);
-                          }}
-                          className="text-[10px] font-semibold text-emerald-600 hover:text-emerald-700"
-                        >
-                          Stock up
-                        </button>
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setRestockItem(item);
+                              setRestockQuantity('');
+                              setRestockError(null);
+                            }}
+                            className="text-[10px] font-semibold text-emerald-600 hover:text-emerald-700"
+                          >
+                            Stock up
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteInventoryItem(item)}
+                            disabled={deletingItemId === item.id}
+                            className="text-[10px] font-semibold text-red-600 hover:text-red-700 disabled:opacity-50"
+                          >
+                            {deletingItemId === item.id ? 'Deleting...' : 'Delete'}
+                          </button>
+                        </>
                       )}
                     </div>
                   </div>
