@@ -44,6 +44,27 @@ interface DailyReport {
   salesByCategory: Record<'DRINK' | 'CONDOM', number>;
   bookings: ReportBooking[];
   sales: ReportSale[];
+  inventorySummary: {
+    totalItems: number;
+    totalUnitsLeft: number;
+    lowStockCount: number;
+    criticalStockCount: number;
+  };
+  topSellingItems: Array<{
+    id: string;
+    name: string;
+    category: 'DRINK' | 'CONDOM';
+    unitsSold: number;
+    revenue: number;
+    stockLeft: number;
+  }>;
+  lowStockItems: Array<{
+    id: string;
+    name: string;
+    category: 'DRINK' | 'CONDOM';
+    stockLeft: number;
+    price: number;
+  }>;
   isLocked: boolean;
   confirmedBy?: {
     id: string;
@@ -422,6 +443,91 @@ export default function ReportsPage() {
                   <span className="font-medium text-gray-700 dark:text-gray-300">
                     Other ({totals.totalPayments ? Math.max(0, 100 - digitalShare - cashShare) : 0}%)
                   </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 mb-8">
+          <div className="xl:col-span-1 rounded-xl border border-gray-200 dark:border-gray-800 p-6 bg-white dark:bg-[#111318]/50">
+            <p className="text-lg font-bold text-gray-900 dark:text-white">Inventory Snapshot</p>
+            <p className="text-gray-500 dark:text-gray-400 text-sm mb-4">
+              Current stock position across inventory items
+            </p>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-500 dark:text-gray-400">Total Items</span>
+                <span className="text-lg font-bold text-gray-900 dark:text-white">{report?.inventorySummary.totalItems ?? 0}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-500 dark:text-gray-400">Units Left</span>
+                <span className="text-lg font-bold text-blue-600">{report?.inventorySummary.totalUnitsLeft ?? 0}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-500 dark:text-gray-400">Low Stock (≤ 10)</span>
+                <span className="text-sm font-bold text-amber-600">{report?.inventorySummary.lowStockCount ?? 0}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-500 dark:text-gray-400">Critical (≤ 5)</span>
+                <span className="text-sm font-bold text-rose-600">{report?.inventorySummary.criticalStockCount ?? 0}</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="xl:col-span-2 rounded-xl border border-gray-200 dark:border-gray-800 p-6 bg-white dark:bg-[#111318]/50">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div>
+                <p className="text-lg font-bold text-gray-900 dark:text-white">Top Selling Items (Today)</p>
+                <p className="text-gray-500 dark:text-gray-400 text-sm mb-3">Items moving fastest by quantity sold.</p>
+                <div className="space-y-2">
+                  {(report?.topSellingItems ?? []).length === 0 ? (
+                    <p className="text-sm text-gray-500 dark:text-gray-400">No inventory sales yet today.</p>
+                  ) : (
+                    report?.topSellingItems.map((item) => (
+                      <div key={item.id} className="rounded-lg border border-gray-200 dark:border-gray-700 px-3 py-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">{item.name}</p>
+                          <span className="text-[10px] uppercase font-bold text-gray-500 dark:text-gray-400">{item.category}</span>
+                        </div>
+                        <div className="mt-1 flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
+                          <span>{item.unitsSold} sold</span>
+                          <span>{formatCurrency(item.revenue)}</span>
+                          <span>{item.stockLeft} left</span>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <p className="text-lg font-bold text-gray-900 dark:text-white">Low Stock Alert</p>
+                <p className="text-gray-500 dark:text-gray-400 text-sm mb-3">Items close to running out.</p>
+                <div className="space-y-2">
+                  {(report?.lowStockItems ?? []).length === 0 ? (
+                    <p className="text-sm text-gray-500 dark:text-gray-400">No low-stock items right now.</p>
+                  ) : (
+                    report?.lowStockItems.map((item) => (
+                      <div key={item.id} className="rounded-lg border border-gray-200 dark:border-gray-700 px-3 py-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">{item.name}</p>
+                          <span
+                            className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                              item.stockLeft <= 5 ? 'bg-rose-500/15 text-rose-600' : 'bg-amber-500/15 text-amber-600'
+                            }`}
+                          >
+                            {item.stockLeft <= 5 ? 'CRITICAL' : 'LOW'}
+                          </span>
+                        </div>
+                        <div className="mt-1 flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
+                          <span>{item.stockLeft} left</span>
+                          <span>{item.category}</span>
+                          <span>{formatCurrency(item.price)}</span>
+                        </div>
+                      </div>
+                    ))
+                  )}
                 </div>
               </div>
             </div>
