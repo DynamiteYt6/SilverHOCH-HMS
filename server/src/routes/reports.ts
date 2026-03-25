@@ -208,7 +208,6 @@ router.get(
         by: ["itemId"],
         _sum: { quantity: true, totalPrice: true },
         _count: { id: true },
-        orderBy: { _sum: { totalPrice: "desc" } },
       });
 
       // 3. Build a lookup map: itemId -> sales data
@@ -246,7 +245,19 @@ router.get(
         };
       });
 
-      // 5. Summary stats
+      // 5. Sales by category — derived from enrichedItems (item relation already available)
+      const salesByCategory = {
+        DRINK: 0,
+        CONDOM: 0,
+      };
+
+      enrichedItems.forEach((item) => {
+        if (item.category === "DRINK" || item.category === "CONDOM") {
+          salesByCategory[item.category] += item.totalRevenue;
+        }
+      });
+
+      // 6. Summary stats
       const totalItems = items.length;
       const lowStockCount = enrichedItems.filter((i) => i.isLowStock).length;
       const criticalCount = enrichedItems.filter((i) => i.isCritical).length;
@@ -270,6 +281,7 @@ router.get(
           totalAllTimeRevenue,
         },
         items: enrichedItems,
+        salesByCategory,
         // Top 5 best sellers by quantity sold
         bestSellers: [...enrichedItems]
           .sort((a, b) => b.totalQtySold - a.totalQtySold)
@@ -279,10 +291,14 @@ router.get(
           .filter((i) => i.isLowStock)
           .sort((a, b) => a.currentStock - b.currentStock),
       });
-    } catch (error) {
-      console.error(error);
-      res.status(500).json({ message: "Failed to generate inventory report" });
+    } catch (error: any) {
+      console.error("INVENTORY ERROR:", error);
+      res.status(500).json({
+        message: "Failed to generate inventory report",
+        error: error.message,
+      });
     }
   }
 );
+
 export default router;
