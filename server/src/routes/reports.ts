@@ -189,4 +189,100 @@ router.post(
   }
 );
 
+// ============================================
+// GET /api/reports/inventory - Inventory summary
+// ============================================
+router.get(
+  "/inventory",
+  requireAuth,
+  requireRole(UserRole.SUPER_ADMIN, UserRole.ADMIN),
+  async (req, res) => {
+    try {
+      // 1. All current inventory items with stock levels
+      const items = await prisma.inventoryItem.findMany({
+        orderBy: { name: "asc" },
+      });
+
+      // 2. All-time sales aggregated per item
+      const salesAgg = await prisma.sale.groupBy({
+        by: ["itemId"],
+        _sum: { quantity: true, totalPrice: true },
+        _count: { id: true },
+        orderBy: { _sum: { totalPrice: "desc" } },
+      });
+
+      // 3. Build a lookup map: itemId -> sales data
+      const salesMap = new Map(
+        salesAgg.map((s) => [
+          s.itemId,
+          {
+            totalQtySold: s._sum.quantity ?? 0,
+            totalRevenue: s._sum.totalPrice ?? 0,
+            transactionCount: s._count.id,
+          },
+        ])
+      );
+
+      // 4. Merge items with their sales stats
+      const enrichedItems = items.map((item) => {
+        const sales = salesMap.get(item.id) ?? {
+          totalQtySold: 0,
+          totalRevenue: 0,
+          transactionCount: 0,
+        };
+        return {
+          id: item.id,
+          name: item.name,
+          category: item.category,
+          currentStock: item.quantity,
+          price: item.price,
+          imageUrl: item.imageUrl,
+          totalQtySold: sales.totalQtySold,
+          totalRevenue: sales.totalRevenue,
+          transactionCount: sales.transactionCount,
+          // Low stock = 10 or fewer remaining
+          isLowStock: item.quantity <= 10,
+          isCritical: item.quantity <= 5,
+        };
+      });
+
+      // 5. Summary stats
+      const totalItems = items.length;
+      const lowStockCount = enrichedItems.filter((i) => i.isLowStock).length;
+      const criticalCount = enrichedItems.filter((i) => i.isCritical).length;
+      const outOfStockCount = enrichedItems.filter((i) => i.currentStock === 0).length;
+      const totalInventoryValue = items.reduce(
+        (sum, item) => sum + item.price * item.quantity,
+        0
+      );
+      const totalAllTimeRevenue = salesAgg.reduce(
+        (sum, s) => sum + (s._sum.totalPrice ?? 0),
+        0
+      );
+
+      res.json({
+        summary: {
+          totalItems,
+          lowStockCount,
+          criticalCount,
+          outOfStockCount,
+          totalInventoryValue,
+          totalAllTimeRevenue,
+        },
+        items: enrichedItems,
+        // Top 5 best sellers by quantity sold
+        bestSellers: [...enrichedItems]
+          .sort((a, b) => b.totalQtySold - a.totalQtySold)
+          .slice(0, 5),
+        // All low stock items sorted by urgency
+        lowStockItems: enrichedItems
+          .filter((i) => i.isLowStock)
+          .sort((a, b) => a.currentStock - b.currentStock),
+      });
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ message: "Failed to generate inventory report" });
+    }
+  }
+);
 export default router;
