@@ -2,9 +2,11 @@ import { useEffect, useRef, useState } from 'react';
 import Layout from '../components/Layout';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
+import { useSearchParams } from 'react-router-dom';
 
 export default function SettingsPage() {
   const { user, updateUser } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState<'profile' | 'hotel' | 'system'>('profile');
   const [profileStatus, setProfileStatus] = useState<string | null>(null);
   const [settingsStatus, setSettingsStatus] = useState<string | null>(null);
@@ -47,6 +49,22 @@ export default function SettingsPage() {
     acOvernightPrice: '20000',
     acShortStayPrice: '10000',
   });
+
+  useEffect(() => {
+    const tabParam = searchParams.get('tab');
+    if (tabParam === 'profile' || tabParam === 'hotel' || tabParam === 'system') {
+      setActiveTab(tabParam);
+    }
+  }, [searchParams]);
+
+  const hasAdminSettingsAccess = user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN';
+
+  useEffect(() => {
+    if (!hasAdminSettingsAccess && activeTab !== 'profile') {
+      setActiveTab('profile');
+      setSearchParams({ tab: 'profile' }, { replace: true });
+    }
+  }, [activeTab, hasAdminSettingsAccess, setSearchParams]);
 
   useEffect(() => {
     if (!user) return;
@@ -240,7 +258,10 @@ export default function SettingsPage() {
         <div className="border-b border-gray-200 dark:border-gray-800 mb-6">
           <div className="flex flex-wrap justify-center gap-6">
           <button
-            onClick={() => setActiveTab('profile')}
+            onClick={() => {
+              setActiveTab('profile');
+              setSearchParams({ tab: 'profile' }, { replace: true });
+            }}
             className={`py-4 border-b-2 transition-colors ${
               activeTab === 'profile'
                 ? 'border-blue-600 text-blue-600'
@@ -253,7 +274,12 @@ export default function SettingsPage() {
             Profile
           </button>
           <button
-            onClick={() => setActiveTab('hotel')}
+            onClick={() => {
+              if (!hasAdminSettingsAccess) return;
+              setActiveTab('hotel');
+              setSearchParams({ tab: 'hotel' }, { replace: true });
+            }}
+            disabled={!hasAdminSettingsAccess}
             className={`py-4 border-b-2 transition-colors ${
               activeTab === 'hotel'
                 ? 'border-blue-600 text-blue-600'
@@ -266,12 +292,17 @@ export default function SettingsPage() {
             Hotel
           </button>
           <button
-            onClick={() => setActiveTab('system')}
+            onClick={() => {
+              if (!hasAdminSettingsAccess) return;
+              setActiveTab('system');
+              setSearchParams({ tab: 'system' }, { replace: true });
+            }}
+            disabled={!hasAdminSettingsAccess}
             className={`py-4 border-b-2 transition-colors ${
               activeTab === 'system'
                 ? 'border-blue-600 text-blue-600'
                 : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-white'
-            } text-sm font-bold flex items-center gap-2`}
+            } text-sm font-bold flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed`}
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
