@@ -42,18 +42,7 @@ router.get(
         }
       });
 
-      const inventoryItems = await prisma.inventoryItem.findMany({
-        orderBy: { name: "asc" },
-      });
-
       if (!businessDay) {
-        const inventorySummary = {
-          totalItems: inventoryItems.length,
-          totalUnitsLeft: inventoryItems.reduce((sum, item) => sum + item.quantity, 0),
-          lowStockCount: inventoryItems.filter((item) => item.quantity <= 10).length,
-          criticalStockCount: inventoryItems.filter((item) => item.quantity <= 5).length,
-        };
-
         return res.json({
           date: reportDate,
           summary: {
@@ -67,17 +56,6 @@ router.get(
           salesByCategory: { DRINK: 0, CONDOM: 0 },
           bookings: [],
           sales: [],
-          inventorySummary,
-          topSellingItems: [],
-          lowStockItems: inventoryItems
-            .filter((item) => item.quantity <= 10)
-            .map((item) => ({
-              id: item.id,
-              name: item.name,
-              category: item.category,
-              stockLeft: item.quantity,
-              price: item.price,
-            })),
           isLocked: false,
         });
       }
@@ -127,52 +105,6 @@ router.get(
         salesByCategory[sale.item.category] += sale.totalPrice;
       });
 
-      const topSellingMap = new Map<
-        string,
-        { id: string; name: string; category: "DRINK" | "CONDOM"; unitsSold: number; revenue: number; stockLeft: number }
-      >();
-
-      businessDay.sales.forEach((sale) => {
-        const key = sale.itemId;
-        const existing = topSellingMap.get(key);
-        if (existing) {
-          existing.unitsSold += sale.quantity;
-          existing.revenue += sale.totalPrice;
-          existing.stockLeft = sale.item.quantity;
-        } else {
-          topSellingMap.set(key, {
-            id: sale.item.id,
-            name: sale.item.name,
-            category: sale.item.category,
-            unitsSold: sale.quantity,
-            revenue: sale.totalPrice,
-            stockLeft: sale.item.quantity,
-          });
-        }
-      });
-
-      const topSellingItems = Array.from(topSellingMap.values())
-        .sort((a, b) => b.unitsSold - a.unitsSold)
-        .slice(0, 5);
-
-      const inventorySummary = {
-        totalItems: inventoryItems.length,
-        totalUnitsLeft: inventoryItems.reduce((sum, item) => sum + item.quantity, 0),
-        lowStockCount: inventoryItems.filter((item) => item.quantity <= 10).length,
-        criticalStockCount: inventoryItems.filter((item) => item.quantity <= 5).length,
-      };
-
-      const lowStockItems = inventoryItems
-        .filter((item) => item.quantity <= 10)
-        .slice(0, 8)
-        .map((item) => ({
-          id: item.id,
-          name: item.name,
-          category: item.category,
-          stockLeft: item.quantity,
-          price: item.price,
-        }));
-
       // Prepare response
       const report = {
         date: reportDate,
@@ -187,9 +119,6 @@ router.get(
         salesByCategory,
         bookings: businessDay.bookings,
         sales: businessDay.sales,
-        inventorySummary,
-        topSellingItems,
-        lowStockItems,
         isLocked: businessDay.isLocked,
         confirmedBy: businessDay.confirmedBy,
       };
