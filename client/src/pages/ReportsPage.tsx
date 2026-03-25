@@ -72,8 +72,12 @@ interface InventoryReport {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-const fmt = (amount: number) =>
-  new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN' }).format(amount);
+const fmt = (amount: number) => {
+  if (amount >= 1_000_000_000) return `₦${(amount / 1_000_000_000).toFixed(1)}B`;
+  if (amount >= 1_000_000) return `₦${(amount / 1_000_000).toFixed(1)}M`;
+  if (amount >= 1_000) return `₦${(amount / 1_000).toFixed(1)}K`;
+  return new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN' }).format(amount);
+};
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
@@ -93,7 +97,7 @@ function StatCard({
   return (
     <div className="flex flex-col gap-2 rounded-xl p-6 border border-gray-200 dark:border-gray-800 bg-white dark:bg-[#111318]/50">
       <p className="text-gray-500 dark:text-gray-400 text-xs font-semibold uppercase tracking-wider">{title}</p>
-      <p className="text-3xl font-bold leading-tight text-gray-900 dark:text-white">{value}</p>
+      <p className="text-2xl font-bold leading-tight break-all text-gray-900 dark:text-white">{value}</p>
       <div className="flex items-center gap-2 mt-1">
         <span className={`${tone} text-sm font-bold flex items-center gap-1`}>
           <span className="material-symbols-outlined text-sm">{icon}</span>
@@ -344,7 +348,7 @@ export default function ReportsPage() {
         </div>
 
         {/* ════════════════════════════════════════
-            TAB 1 — DAILY RECONCILIATION (unchanged)
+            TAB 1 — DAILY RECONCILIATION
         ════════════════════════════════════════ */}
         {activeTab === 'daily' && (
           <>
@@ -387,7 +391,7 @@ export default function ReportsPage() {
               ].map((stat) => (
                 <div key={stat.title} className="flex flex-col gap-2 rounded-xl p-6 border border-gray-200 dark:border-gray-800 bg-white dark:bg-[#111318]/50">
                   <p className="text-gray-500 dark:text-gray-400 text-xs font-semibold uppercase tracking-wider">{stat.title}</p>
-                  <p className="text-3xl font-bold leading-tight text-gray-900 dark:text-white">{fmt(stat.value)}</p>
+                  <p className="text-2xl font-bold leading-tight break-all text-gray-900 dark:text-white">{fmt(stat.value)}</p>
                   <div className="flex items-center gap-2 mt-1">
                     <span className={`${stat.tone} text-sm font-bold flex items-center gap-1`}>
                       <span className="material-symbols-outlined text-sm">{stat.icon}</span>
