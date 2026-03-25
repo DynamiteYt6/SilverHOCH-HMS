@@ -208,7 +208,6 @@ router.get(
         by: ["itemId"],
         _sum: { quantity: true, totalPrice: true },
         _count: { id: true },
-        orderBy: { _sum: { totalPrice: "desc" } },
       });
 
       // 3. Build a lookup map: itemId -> sales data
